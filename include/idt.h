@@ -11,9 +11,9 @@ struct IDT_entry {
     uint16_t offset_higherbits;
 } __attribute__((packed));
 
+extern void dummy_isr();
 extern struct IDT_entry idt[256];
 
 void setup_idt();
-void dummy_handler();
 
 #endif

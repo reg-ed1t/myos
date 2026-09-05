@@ -21,7 +21,7 @@ static inline uint8_t pmm_bitmap_test(uint32_t bit) {
 
 // Find the first free bit (0) inside the tracking array
 int pmm_bitmap_first_free() {
-    for (uint32_t i = 0; i < pmm_max_blocks / 32; i++) {
+    for (uint32_t i = 0; i < ((pmm_max_blocks + 31) / 32); i++) {
         if (pmm_bitmap[i] != 0xFFFFFFFF) { // If any bit in this 32-bit chunk is 0
             for (int j = 0; j < 32; j++) {
                 if (!(pmm_bitmap[i] & (1 << j))) {
@@ -36,7 +36,7 @@ int pmm_bitmap_first_free() {
 void pmm_init(uint32_t mem_size, uint32_t bitmap_start_addr) {
     pmm_max_blocks = mem_size / PMM_BLOCK_SIZE;
     pmm_bitmap = (uint32_t*)bitmap_start_addr;
-    pmm_bitmap_size = pmm_max_blocks / 32;
+    pmm_bitmap_size = (pmm_max_blocks + 31) / 32;
 
     // By default, mark all memory regions as reserved/used (all bits set to 1)
     // We do this for safety so we don't accidentally allocate non-existent RAM
@@ -50,6 +50,14 @@ void pmm_init_region(uint32_t base_addr, uint32_t size) {
     uint32_t align_block = base_addr / PMM_BLOCK_SIZE;
     uint32_t num_blocks = size / PMM_BLOCK_SIZE;
 
+    if (align_block >= pmm_max_blocks) {
+        return;
+    }
+
+    if (num_blocks > pmm_max_blocks - align_block) {
+        num_blocks = pmm_max_blocks - align_block;
+    }
+
     for (uint32_t i = 0; i < num_blocks; i++) {
         pmm_bitmap_unset(align_block + i);
     }
@@ -59,6 +67,14 @@ void pmm_init_region(uint32_t base_addr, uint32_t size) {
 void pmm_deinit_region(uint32_t base_addr, uint32_t size) {
     uint32_t align_block = base_addr / PMM_BLOCK_SIZE;
     uint32_t num_blocks = size / PMM_BLOCK_SIZE;
+	
+	if (align_block >= pmm_max_blocks) {
+        return;
+    }
+
+    if (num_blocks > pmm_max_blocks - align_block) {
+        num_blocks = pmm_max_blocks - align_block;
+    }
 
     for (uint32_t i = 0; i < num_blocks; i++) {
         pmm_bitmap_set(align_block + i);
@@ -81,6 +97,16 @@ void* pmm_alloc_block() {
 void pmm_free_block(void* p) {
     uint32_t addr = (uint32_t)p;
     uint32_t block = addr / PMM_BLOCK_SIZE;
+
+    if (block >= pmm_max_blocks) {
+        kprint("PMM: invalid block address\n");
+        return;
+    }
+
+    if (!pmm_bitmap_test(block)) {
+        kprint("PMM: double free detected\n");
+        return;
+    }
 
     pmm_bitmap_unset(block);
 }

@@ -120,6 +120,13 @@ exception_common:
     add esp, 8          ; Clean up error code and exception number
     iret
 
+global dummy_isr
+
+dummy_isr:
+    pusha
+    popa
+    iret
+
 ; mouse
 global mouse_isr_asm
 extern mouse_handler

@@ -9,10 +9,6 @@ extern void keyboard_isr_asm();
 extern void timer_isr_asm();
 extern void mouse_isr_asm();
 
-void dummy_handler() {
-    outb(0x20, 0x20);
-    outb(0xA0, 0x20);
-}
 
 // Declare the assembly stubs
 extern void exception_0();
@@ -43,13 +39,15 @@ void exception_handler(struct registers* regs) {
 void setup_idt() {
     debug_put('I', 70); // debug IDT start
     
-    for(int i = 0; i < 256; i++) {
-        idt[i].offset_lowerbits = ((uint32_t)dummy_handler) & 0xFFFF;
-        idt[i].selector = 0x08;
-        idt[i].zero = 0;
-        idt[i].type_attr = 0x8E;
-        idt[i].offset_higherbits = (((uint32_t)dummy_handler) >> 16) & 0xFFFF;
-    }
+	uint32_t dummy_addr = (uint32_t)dummy_isr;
+
+	for (int i = 0; i < 256; i++) {
+		idt[i].offset_lowerbits = dummy_addr & 0xFFFF;
+		idt[i].selector = 0x08;
+		idt[i].zero = 0;
+		idt[i].type_attr = 0x8E;
+		idt[i].offset_higherbits = (dummy_addr >> 16) & 0xFFFF;
+	}
 	
 	//keyboard IDT
     uint32_t kb_address = (uint32_t)keyboard_isr_asm;

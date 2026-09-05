@@ -27,8 +27,13 @@ void init_vmm() {
         // Allocate a page table if one doesn't exist for this 4MB block
         if (!(pd[pd_idx] & PAGE_PRESENT)) {
             void* new_pt_phys = pmm_alloc_block();
-            // Clear new page table memory
-            uint32_t* pt_ptr = (uint32_t*)new_pt_phys;
+
+			if (!new_pt_phys) {
+				kprint("VMM: out of physical memory\n");
+				return;
+			}
+
+			uint32_t* pt_ptr = (uint32_t*)new_pt_phys;
             for(int k = 0; k < 1024; k++) pt_ptr[k] = 0;
 
             pd[pd_idx] = ((uint32_t)new_pt_phys) | PAGE_PRESENT | PAGE_RW;
@@ -60,7 +65,13 @@ void map_page(void* phys_addr, void* virt_addr, uint32_t flags) {
     // Check if Page Table is present
     if (!(pd[pd_idx] & PAGE_PRESENT)) {
         void* new_pt_phys = pmm_alloc_block();
-        pd[pd_idx] = ((uint32_t)new_pt_phys) | PAGE_PRESENT | PAGE_RW | flags;
+
+		if (!new_pt_phys) {
+			kprint("VMM: out of physical memory\n");
+			return;
+		}	
+
+		pd[pd_idx] = ((uint32_t)new_pt_phys) | PAGE_PRESENT | PAGE_RW | flags;
 
         // Invalidate TLB for the corresponding page table access range
         invalidate_tlb_asm(VMM_PAGE_TABLE_BASE + (pd_idx * 4096));
@@ -96,23 +107,26 @@ void unmap_page(void* virt_addr) {
 
 // Low-level diagnostic C handler called from exception 14 assembly stub
 void page_fault_handler_c(uint32_t error_code, uint32_t faulting_address) {
-    kprint("PAGE FAULT DETECTED! ");
-    kprint("Faulting Virtual Address: ");
-    
-    // Convert faulting virtual address to displayable output
-    uint32_t num = faulting_address;
-    char hex_str[11] = "0x00000000";
-    char hex_chars[] = "0123456789ABCDEF";
-    for(int i = 9; i >= 2; i--) {
-        hex_str[i] = hex_chars[num & 0xF];
-        num >>= 4;
-    }
-    kprint(hex_str);
-    new_line();
+    kprint("PAGE FAULT\n");
 
-    if (!(error_code & 0x1)) kprint("Reason: Page Not Present\n");
-    if (error_code & 0x2)   kprint("Reason: Write Operation Violation\n");
-    if (error_code & 0x4)   kprint("Reason: Processor Executing in User-Mode\n");
+    kprint("Address: ");
+    kprint_hex(faulting_address);
+    kprint("\n");
 
-    while(1) { asm volatile("hlt"); }
+    if (error_code & 0x1)
+        kprint("Present: yes (protection violation)\n");
+    else{
+		kprint("Present: no\n");}
+
+    if (error_code & 0x2){
+        kprint("Access: write\n");}
+    else{
+        kprint("Access: read\n");}
+
+    if (error_code & 0x4){
+        kprint("Mode: user\n");}
+    else{
+        kprint("Mode: kernel\n");}
+	
+	while(1) { asm volatile("hlt"); }
 }

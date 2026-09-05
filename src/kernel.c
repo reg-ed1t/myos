@@ -102,22 +102,6 @@ void kernel_main(void) {
     outb(0xA1, 0x02);
     outb(0x21, 0x01);
     outb(0xA1, 0x01);
-    
-	init_timer(100);
-	
-	init_mouse();
-	
-    // mask everything except IRQ1
-	outb(0x21, 0xF8); 	
-    outb(0xA1, 0xEF);
-
-    debug_put('S', 73); // debug STI
-    asm volatile("sti");
-
-    kprint("system up.");
-    
-    sym = ((sym / 160) + 1) * 160;
-    update_cursor(sym / 2);
 	
 	// Initialize PMM to track 32MB of RAM, placing the bitmap array at 0x400000 (4MB)
     pmm_init(32 * 1024 * 1024, 0x400000);
@@ -138,7 +122,7 @@ void kernel_main(void) {
     new_line();
 
     pmm_free_block(block1); // Return memory safely
-	
+    
 	init_vmm();
     kprint("VMM (Paging) fully online.");
     new_line();
@@ -157,6 +141,23 @@ void kernel_main(void) {
         kprint("Virtual Memory Test Passed! Mapped 0xC0000000 successfully.");
         new_line();
     }
+	init_timer(100);
+	
+	init_mouse();
+	
+    // mask everything except IRQ1
+	outb(0x21, 0xF8); 	
+    outb(0xA1, 0xEF);
+
+    kprint("system up.");
+    
+    sym = ((sym / 160) + 1) * 160;
+    update_cursor(sym / 2);
+	
+	
+
+	debug_put('s', 73); // debug STI
+    asm volatile("sti");
 
     // Infinite kernel execution loop
     while(1) {
