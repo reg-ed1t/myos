@@ -1,0 +1,47 @@
+name: Build OS Project
+
+on:
+push:
+branches: [ "main", "master" ]
+pull_request:
+branches: [ "main", "master" ]
+workflow_dispatch:
+
+jobs:
+build:
+runs-on: ubuntu-latest
+
+steps:
+- name: Checkout repository
+  uses: actions/checkout@v4
+
+- name: Install build tools
+  run: |
+    sudo apt-get update
+    sudo apt-get install -y make nasm xorriso grub-pc-bin clang lld
+
+- name: Setup i386-elf Toolchain
+  run: |
+    curl -L \
+      -o /tmp/i386-elf-toolchain-v1.0.0.tar.xz \
+      https://github.com/reg-ed1t/myos/releases/download/toolchain-v1/i386-elf-toolchain-v1.0.0.tar.xz
+    sudo mkdir -p /opt/i386-elf
+    sudo tar -xJf /tmp/i386-elf-toolchain-v1.0.0.tar.xz -C /opt/i386-elf
+    echo "/opt/i386-elf/bin" >> "$GITHUB_PATH"
+
+- name: Build OS Kernel with GCC
+  run: make all TOOLCHAIN=gcc
+
+- name: Build OS Kernel with Clang
+  run: |
+    make clean
+    make all TOOLCHAIN=clang
+
+- name: Upload Build Artifacts
+  uses: actions/upload-artifact@v4
+  with:
+    name: os-build-artifact
+    path: |
+      build/
+      *.iso
+      *.bin
