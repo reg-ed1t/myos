@@ -41,7 +41,7 @@ void new_line(){
 		scroll();
 	}
 	update_cursor(sym / 2);
-};
+}
 
 void debug_put(char c, int pos) {
     video_memory[pos * 2] = c;
@@ -70,7 +70,7 @@ void kprint(const char* str) {
                 scroll();
             }
             video_memory[sym] = str[i];
-            video_memory[sym + 1] = (VGA_C_BLUE << 4) | VGA_C_WHITE;;
+            video_memory[sym + 1] = (VGA_C_BLUE << 4) | VGA_C_WHITE;
             sym += 2;
             update_cursor(sym / 2);
         }

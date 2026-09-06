@@ -8,10 +8,14 @@ extern void invalidate_tlb_asm(uint32_t virt_addr);
 
 static uint32_t* current_page_directory_phys = 0;
 
-void init_vmm() {
+int init_vmm() {
     // 1. Allocate a physical frame for the Master Page Directory
     current_page_directory_phys = (uint32_t*)pmm_alloc_block();
     uint32_t* pd = current_page_directory_phys;
+    if (!current_page_directory_phys) {
+        kprint("VMM: failed to allocate page directory\n");
+        return 1;
+    }
 
     // Clear all directory entries (Mark NOT PRESENT)
     for (int i = 0; i < 1024; i++) {
@@ -30,7 +34,7 @@ void init_vmm() {
 
 			if (!new_pt_phys) {
 				kprint("VMM: out of physical memory\n");
-				return;
+				return 1;
 			}
 
 			uint32_t* pt_ptr = (uint32_t*)new_pt_phys;
@@ -50,45 +54,52 @@ void init_vmm() {
     // 4. Register control registers & enable CPU paging
     load_page_directory_asm(current_page_directory_phys);
     enable_paging_asm();
+    return 1;
 }
 
-void map_page(void* phys_addr, void* virt_addr, uint32_t flags) {
+int map_page(void* phys_addr, void* virt_addr, uint32_t flags)
+{
     uint32_t vaddr = (uint32_t)virt_addr;
     uint32_t paddr = (uint32_t)phys_addr;
 
     uint32_t pd_idx = PAGE_DIRECTORY_INDEX(vaddr);
     uint32_t pt_idx = PAGE_TABLE_INDEX(vaddr);
 
-    // Access page directory via recursive mapping memory
     uint32_t* pd = (uint32_t*)VMM_PAGE_DIR_BASE;
 
-    // Check if Page Table is present
     if (!(pd[pd_idx] & PAGE_PRESENT)) {
         void* new_pt_phys = pmm_alloc_block();
 
-		if (!new_pt_phys) {
-			kprint("VMM: out of physical memory\n");
-			return;
-		}	
+        if (!new_pt_phys) {
+            kprint("VMM: out of physical memory\n");
+            return 0;
+        }
 
-		pd[pd_idx] = ((uint32_t)new_pt_phys) | PAGE_PRESENT | PAGE_RW | flags;
+        pd[pd_idx] = ((uint32_t)new_pt_phys) |
+                     PAGE_PRESENT |
+                     PAGE_RW |
+                     flags;
 
-        // Invalidate TLB for the corresponding page table access range
-        invalidate_tlb_asm(VMM_PAGE_TABLE_BASE + (pd_idx * 4096));
+        invalidate_tlb_asm(
+                VMM_PAGE_TABLE_BASE + (pd_idx * 4096)
+        );
 
-        // Zero out the newly mapped page table
-        uint32_t* pt = (uint32_t*)(VMM_PAGE_TABLE_BASE + (pd_idx * 4096));
+        uint32_t* pt =
+                (uint32_t*)(VMM_PAGE_TABLE_BASE + (pd_idx * 4096));
+
         for (int i = 0; i < 1024; i++) {
             pt[i] = 0;
         }
     }
 
-    // Access Page Table through recursive address offset and insert physical mapping
-    uint32_t* pt = (uint32_t*)(VMM_PAGE_TABLE_BASE + (pd_idx * 4096));
+    uint32_t* pt =
+            (uint32_t*)(VMM_PAGE_TABLE_BASE + (pd_idx * 4096));
+
     pt[pt_idx] = (paddr & ~0xFFF) | PAGE_PRESENT | flags;
 
-    // Invalidate stale TLB entry for the target virtual address
     invalidate_tlb_asm(vaddr);
+
+    return 1;
 }
 
 void unmap_page(void* virt_addr) {

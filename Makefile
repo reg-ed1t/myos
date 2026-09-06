@@ -1,15 +1,36 @@
-CROSS_PREFIX ?= i386-elf-
+TOOLCHAIN ?= clang
 
-CC = $(CROSS_PREFIX)gcc
+ifeq ($(TOOLCHAIN), clang)
+    CC      = clang
+    LD      = ld.lld
+    
+    CFLAGS_TOOLCHAIN  = --target=i386-pc-none-elf
+    STRICT_EXTRA      = -Wgnu
+    LDFLAGS_TOOLCHAIN = -m elf_i386
+else ifeq ($(TOOLCHAIN), gcc)
+    CROSS_PREFIX     ?= i386-elf-
+    CC                = $(CROSS_PREFIX)gcc
+    LD                = $(CROSS_PREFIX)gcc
+    
+    CFLAGS_TOOLCHAIN  =
+    STRICT_EXTRA      =
+    LDFLAGS_TOOLCHAIN = -ffreestanding -O2 -lgcc
+else
+    $(error Unknown TOOLCHAIN: $(TOOLCHAIN). Supported options are 'clang' and 'gcc')
+endif
+
 AS = nasm
-LD = $(CROSS_PREFIX)gcc
 
-CFLAGS = -Iinclude -std=gnu99 -ffreestanding -O2 -Wall -Wextra -fno-stack-protector -fno-pie -fno-pic
-STRICT_CFLAGS = $(CFLAGS) -Werror -Wpedantic -Wshadow -Wpointer-arith -Wcast-align \
-                -Wwrite-strings -Wstrict-prototypes -Wmissing-prototypes
+COMMON_CFLAGS = -Iinclude -std=gnu99 -ffreestanding -O2 -Wall -Wextra \
+                -fno-stack-protector -fno-pie -fno-pic
+
+CFLAGS        = $(CFLAGS_TOOLCHAIN) $(COMMON_CFLAGS)
+STRICT_CFLAGS = $(CFLAGS) $(STRICT_EXTRA) -Werror -Wpedantic -Wshadow \
+                -Wpointer-arith -Wcast-align -Wwrite-strings \
+                -Wstrict-prototypes -Wmissing-prototypes -Og -g
 
 ASFLAGS = -f elf32
-LDFLAGS = -ffreestanding -O2 -nostdlib -T linker.ld -lgcc
+LDFLAGS = $(LDFLAGS_TOOLCHAIN) -nostdlib -T linker.ld
 
 BUILD_DIR = build
 OBJ_DIR = $(BUILD_DIR)/obj

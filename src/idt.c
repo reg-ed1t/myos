@@ -8,6 +8,9 @@ struct IDT_entry idt[256];
 extern void keyboard_isr_asm();
 extern void timer_isr_asm();
 extern void mouse_isr_asm();
+extern void dummy_isr();
+extern void default_master_irq();
+extern void default_slave_irq();
 
 
 // Declare the assembly stubs
@@ -76,6 +79,22 @@ void setup_idt() {
 	uint32_t mouse_address = (uint32_t)mouse_isr_asm;
     idt[0x2C].offset_lowerbits = mouse_address & 0xFFFF;
     idt[0x2C].offset_higherbits = (mouse_address >> 16) & 0xFFFF;
+
+    uint32_t master_irq_addr = (uint32_t)default_master_irq;
+    uint32_t slave_irq_addr = (uint32_t)default_slave_irq;
+
+/* Unused master IRQs: IRQ3-7 */
+    for (int i = 0x23; i <= 0x27; i++) {
+        idt[i].offset_lowerbits = master_irq_addr & 0xFFFF;
+        idt[i].offset_higherbits = (master_irq_addr >> 16) & 0xFFFF;
+    }
+
+/* Unused slave PIC IRQs: IRQ8-15 */
+    /* Unused slave IRQs: IRQ8-15 */
+    for (int i = 0x28; i <= 0x2F; i++) {
+        idt[i].offset_lowerbits = slave_irq_addr & 0xFFFF;
+        idt[i].offset_higherbits = (slave_irq_addr >> 16) & 0xFFFF;
+    }
 
     struct {
         uint16_t limit;

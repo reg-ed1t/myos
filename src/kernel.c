@@ -111,28 +111,59 @@ void kernel_main(void) {
 
     kprint("Physical Memory Manager online.");
     new_line();
-	void* block1 = pmm_alloc_block();
+    void* block1 = pmm_alloc_block();
+    if (!block1) {
+        kprint("FATAL: PMM allocation failed (block1).");
+        new_line();
+        while (1) {
+            asm volatile("hlt");
+        }
+    }
+
     void* block2 = pmm_alloc_block();
+    if (!block2) {
+        kprint("FATAL: PMM allocation failed (block2).");
+        new_line();
+        pmm_free_block(block1);
 
-    kprint("Allocated Block 1 at: ");
-    kprint_int((uint32_t)block1); // Uses your custom integer printing helper
-    new_line();
-    kprint("Allocated Block 2 at: ");
-    kprint_int((uint32_t)block2);
-    new_line();
+        while (1) {
+            asm volatile("hlt");
+        }
+    }
 
-    pmm_free_block(block1); // Return memory safely
-    
-	init_vmm();
+    if (!init_vmm()) {
+        kprint("FATAL: VMM initialization failed.");
+        new_line();
+
+        while (1) {
+            asm volatile("hlt");
+        }
+    }
     kprint("VMM (Paging) fully online.");
     new_line();
 
-    // Allocate 1 physical block from PMM
     void* phys_frame = pmm_alloc_block();
 
-    // Map physical frame to high virtual address 0xC0000000
-    map_page(phys_frame, (void*)0xC0000000, PAGE_PRESENT | PAGE_RW);
+    if (!phys_frame) {
+        kprint("FATAL: PMM allocation failed (VMM test frame).");
+        new_line();
+        while (1) {
+            asm volatile("hlt");
+        }
+    }
 
+    if (!map_page(phys_frame,
+                  (void*)0xC0000000,
+                  PAGE_PRESENT | PAGE_RW)) {
+        kprint("FATAL: VMM mapping failed.");
+        new_line();
+
+        pmm_free_block(phys_frame);
+
+        while (1) {
+            asm volatile("hlt");
+        }
+    }
     // Test writing to the virtual address
     uint32_t* test_ptr = (uint32_t*)0xC0000000;
     *test_ptr = 0xDEADBEEF;

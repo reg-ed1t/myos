@@ -121,9 +121,28 @@ exception_common:
     iret
 
 global dummy_isr
+global default_master_irq
+global default_slave_irq
 
 dummy_isr:
     pusha
+    popa
+    iret
+
+; Unused IRQs 2-7
+default_master_irq:
+    pusha
+    mov al, 0x20
+    out 0x20, al
+    popa
+    iret
+
+; Unused IRQs 8-15
+default_slave_irq:
+    pusha
+    mov al, 0x20
+    out 0xA0, al
+    out 0x20, al
     popa
     iret
 
