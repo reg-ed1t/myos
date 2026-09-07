@@ -5,7 +5,7 @@
 volatile char* video_memory = (char*) 0xB8000;
 volatile uint16_t sym = 0;
 
-void clear(){
+void clear(void){
 	for (int i = 0; i < 4000; i += 2) {
         video_memory[i] = ' ';
         video_memory[i + 1] = (VGA_C_BLUE << 4) | VGA_C_WHITE;
@@ -16,7 +16,7 @@ void clear(){
 	command_buffer[0] = '\0';
 }
 
-void scroll() {
+void scroll(void) {
 
     for (int i = 0; i < 3840; i++) {
         video_memory[i] = video_memory[i + 160];
@@ -31,7 +31,7 @@ void scroll() {
     update_cursor(sym / 2);
 }
 
-void new_line(){
+void new_line(void){
     if (sym != 0) { 
 		sym = ((sym / 160) + 1) * 160;
 	} else {

@@ -21,9 +21,10 @@ extern volatile uint32_t timer_ticks;
 extern const char scancode_to_ascii[];
 
 void init_timer(uint32_t frequency);
-void timer_handler();
+void timer_handler(void);
 void sleep(uint32_t ticks);
-void keyboard_handler();
+void keyboard_handler(void);
+uint8_t get_cmos_register(int reg);
 
 extern uint8_t rtc_second;
 extern uint8_t rtc_minute;
@@ -42,5 +43,6 @@ extern volatile int32_t mouse_y;
 extern volatile uint8_t mouse_buttons;
 
 void init_mouse(void);
+void mouse_handler(void);
 
 #endif

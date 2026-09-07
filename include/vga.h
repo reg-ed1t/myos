@@ -26,8 +26,8 @@ enum vga_colors{
 	VGA_C_WHITE = 15,
 };
 
-void clear();
-void new_line();
+void new_line(void);
+void clear(void);
 void scroll(void);
 void debug_put(char c, int pos);
 void update_cursor(int character_index);

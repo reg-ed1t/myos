@@ -20,7 +20,7 @@ static inline uint8_t pmm_bitmap_test(uint32_t bit) {
 }
 
 // Find the first free bit (0) inside the tracking array
-int pmm_bitmap_first_free() {
+static int pmm_bitmap_first_free(void) {
     for (uint32_t i = 0; i < ((pmm_max_blocks + 31) / 32); i++) {
         if (pmm_bitmap[i] != 0xFFFFFFFF) { // If any bit in this 32-bit chunk is 0
             for (int j = 0; j < 32; j++) {
@@ -82,7 +82,7 @@ void pmm_deinit_region(uint32_t base_addr, uint32_t size) {
 }
 
 // Allocate one single 4KB block of raw RAM
-void* pmm_alloc_block() {
+void* pmm_alloc_block(void) {
     int free_bit = pmm_bitmap_first_free();
     if (free_bit == -1) {
         return 0; // Return NULL pointer

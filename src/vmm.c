@@ -1,3 +1,4 @@
+#include "io.h"
 #include "vmm.h"
 #include "pmm.h"
 #include "vga.h"
@@ -8,13 +9,13 @@ extern void invalidate_tlb_asm(uint32_t virt_addr);
 
 static uint32_t* current_page_directory_phys = 0;
 
-int init_vmm() {
+int init_vmm(void) {
     // 1. Allocate a physical frame for the Master Page Directory
     current_page_directory_phys = (uint32_t*)pmm_alloc_block();
     uint32_t* pd = current_page_directory_phys;
     if (!current_page_directory_phys) {
         kprint("VMM: failed to allocate page directory\n");
-        return 1;
+        return 0;
     }
 
     // Clear all directory entries (Mark NOT PRESENT)
@@ -34,7 +35,7 @@ int init_vmm() {
 
 			if (!new_pt_phys) {
 				kprint("VMM: out of physical memory\n");
-				return 1;
+				return 0;
 			}
 
 			uint32_t* pt_ptr = (uint32_t*)new_pt_phys;
@@ -139,5 +140,5 @@ void page_fault_handler_c(uint32_t error_code, uint32_t faulting_address) {
     else{
         kprint("Mode: kernel\n");}
 	
-	while(1) { asm volatile("hlt"); }
+	while(1) { hlt(); }
 }

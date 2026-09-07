@@ -1,3 +1,4 @@
+#include "string.h"
 #include "vga.h"
 #include "idt.h"
 #include "drivers.h"
@@ -6,8 +7,9 @@
 #include "pmm.h"
 #include "vmm.h"
 
-extern void timer_isr_asm();
-extern void keyboard_isr_asm();
+extern void timer_isr_asm(void);
+extern void keyboard_isr_asm(void);
+void kernel_main(void);
 
 int str_compare(const volatile char* s1, const char* s2) {
     while (*s1 && (*s1 == *s2)) {
@@ -17,7 +19,7 @@ int str_compare(const volatile char* s1, const char* s2) {
     return *(const unsigned char*)s1 - *(const unsigned char*)s2;
 }
 
-void process_command(const volatile char* buffer) {
+static void process_command(const volatile char* buffer) {
     if (str_compare(buffer, "help") == 0) {
         debug_put('C', 75);
 		kprint("help-list all commands. pleased now?\n");
@@ -64,7 +66,7 @@ void process_command(const volatile char* buffer) {
 int old_grid_x = 0;
 int old_grid_y = 0;
 
-void update_mouse_pointer() {
+static void update_mouse_pointer(void) {
     int current_grid_x = mouse_x / 16;
     int current_grid_y = mouse_y / 16;
 
@@ -115,8 +117,9 @@ void kernel_main(void) {
     if (!block1) {
         kprint("FATAL: PMM allocation failed (block1).");
         new_line();
+        cli();
         while (1) {
-            asm volatile("hlt");
+            hlt();
         }
     }
 
@@ -125,18 +128,18 @@ void kernel_main(void) {
         kprint("FATAL: PMM allocation failed (block2).");
         new_line();
         pmm_free_block(block1);
-
+        hlt();
         while (1) {
-            asm volatile("hlt");
+            hlt();
         }
     }
 
     if (!init_vmm()) {
         kprint("FATAL: VMM initialization failed.");
         new_line();
-
+        hlt();
         while (1) {
-            asm volatile("hlt");
+            hlt();
         }
     }
     kprint("VMM (Paging) fully online.");
@@ -147,8 +150,9 @@ void kernel_main(void) {
     if (!phys_frame) {
         kprint("FATAL: PMM allocation failed (VMM test frame).");
         new_line();
+        cli();
         while (1) {
-            asm volatile("hlt");
+            hlt();
         }
     }
 
@@ -159,9 +163,9 @@ void kernel_main(void) {
         new_line();
 
         pmm_free_block(phys_frame);
-
+        cli();
         while (1) {
-            asm volatile("hlt");
+            hlt();
         }
     }
     // Test writing to the virtual address
@@ -184,11 +188,9 @@ void kernel_main(void) {
     
     sym = ((sym / 160) + 1) * 160;
     update_cursor(sym / 2);
-	
-	
 
 	debug_put('s', 73); // debug STI
-    asm volatile("sti");
+    sti();
 
     // Infinite kernel execution loop
     while(1) {
@@ -198,10 +200,8 @@ void kernel_main(void) {
 			new_line();
             command_len = 0;
             command_ready = 0;
-			//old_grid_x = 0;
-            //old_grid_y = 0;
         }
 		update_mouse_pointer();
-        asm volatile("hlt");
+        hlt();
     }
 }

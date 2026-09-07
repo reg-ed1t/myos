@@ -17,7 +17,7 @@ void set_gdt_gate(int num, uint32_t base, uint32_t limit, uint8_t access, uint8_
     gdt[num].access      = access;
 }
 
-void setup_gdt() {
+void setup_gdt(void) {
     gdt_p.limit = (sizeof(struct GDT_entry) * 3) - 1;
     gdt_p.base  = (uint32_t)&gdt;
 

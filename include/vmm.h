@@ -23,9 +23,9 @@
 typedef uint32_t pd_entry_t;
 typedef uint32_t pt_entry_t;
 
-int init_vmm();
+int init_vmm(void);
 int map_page(void* phys_addr, void* virt_addr, uint32_t flags);
 void unmap_page(void* virt_addr);
-void page_fault_handler(uint32_t error_code, uint32_t faulting_address);
+void page_fault_handler_c(uint32_t error_code, uint32_t faulting_address);
 
 #endif

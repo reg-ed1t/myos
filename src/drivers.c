@@ -26,7 +26,7 @@ void init_timer(uint32_t frequency) {
     outb(0x40, (uint8_t)((divisor >> 8) & 0xFF));
 }
 
-void timer_handler() {
+void timer_handler(void) {
     timer_ticks++;
     
     if (timer_ticks % 100 == 0) {
@@ -42,11 +42,12 @@ void timer_handler() {
 
 void sleep(uint32_t ticks) {
 	uint32_t start = timer_ticks;
+    cli();
 	while ((uint32_t)(timer_ticks - start) < ticks)
-		asm volatile("hlt");
+		hlt();
 }
 
-void keyboard_handler() {
+void keyboard_handler(void) {
     debug_put('H', 74);
 
     uint8_t scancode = inb(0x60);
@@ -110,7 +111,7 @@ uint8_t rtc_month;
 uint32_t rtc_year;
 
 //rtc timer
-void read_rtc() {
+void read_rtc(void) {
     while (get_cmos_register(0x0A) & 0x80);
 
     rtc_second = get_cmos_register(0x00);
@@ -155,7 +156,7 @@ void play_sound(uint32_t frequency) {
     }
 }
 
-void stop_sound() {
+void stop_sound(void) {
     uint8_t speaker_state = inb(SPEAKER_PORT) & 0xFC;
     outb(SPEAKER_PORT, speaker_state);
 }
@@ -170,7 +171,7 @@ int32_t volatile mouse_x = 0;
 int32_t volatile mouse_y = 0;
 uint8_t volatile mouse_buttons = 0;
 
-void mouse_wait(uint8_t type) {
+static void mouse_wait(uint8_t type) {
     uint32_t timeout = 100000;
     if (type == 0) {
         while (timeout--) {
@@ -183,19 +184,19 @@ void mouse_wait(uint8_t type) {
     }
 }
 
-void mouse_write(uint8_t data) {
+static void mouse_write(uint8_t data) {
     mouse_wait(1);
     outb(PS2_COMMAND_PORT, 0xD4);
     mouse_wait(1);
     outb(PS2_DATA_PORT, data);
 }
 
-uint8_t mouse_read() {
+static uint8_t mouse_read(void) {
     mouse_wait(0);
     return inb(PS2_DATA_PORT);
 }
 
-void init_mouse() {
+void init_mouse(void) {
     uint8_t status;
 
     mouse_wait(1);
@@ -221,7 +222,7 @@ void init_mouse() {
 uint8_t mouse_cycle = 0;
 uint8_t mouse_packet[3];
 
-void mouse_handler() {
+void mouse_handler(void) {
     uint8_t status = inb(PS2_STATUS_PORT);
     
     if (!(status & 0x20)) {

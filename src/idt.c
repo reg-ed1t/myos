@@ -5,24 +5,18 @@
 
 struct IDT_entry idt[256];
 
-extern void keyboard_isr_asm();
-extern void timer_isr_asm();
-extern void mouse_isr_asm();
-extern void dummy_isr();
-extern void default_master_irq();
-extern void default_slave_irq();
+extern void keyboard_isr_asm(void);
+extern void timer_isr_asm(void);
+extern void mouse_isr_asm(void);
+extern void dummy_isr(void);
+extern void default_master_irq(void);
+extern void default_slave_irq(void);
 
 
 // Declare the assembly stubs
-extern void exception_0();
-extern void exception_13();
-extern void exception_14();
-
-struct registers {
-    uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; //pushed by pusha
-    uint32_t int_no, err_code;                       //manually
-    uint32_t eip, cs, eflags, useresp, ss;           //by CPU
-};
+extern void exception_0(void);
+extern void exception_13(void);
+extern void exception_14(void);
 
 void exception_handler(struct registers* regs) {
     clear();
@@ -35,11 +29,11 @@ void exception_handler(struct registers* regs) {
     }
     
     while(1) {
-        asm volatile("hlt");
+        hlt();
     }
 }
 
-void setup_idt() {
+void setup_idt(void) {
     debug_put('I', 70); // debug IDT start
     
 	uint32_t dummy_addr = (uint32_t)dummy_isr;
@@ -51,7 +45,23 @@ void setup_idt() {
 		idt[i].type_attr = 0x8E;
 		idt[i].offset_higherbits = (dummy_addr >> 16) & 0xFFFF;
 	}
-	
+
+
+    uint32_t master_irq_addr = (uint32_t)default_master_irq;
+    uint32_t slave_irq_addr = (uint32_t)default_slave_irq;
+
+/* Unused master IRQs: IRQ3-7 */
+    for (int i = 0x22; i <= 0x27; i++) {
+        idt[i].offset_lowerbits = master_irq_addr & 0xFFFF;
+        idt[i].offset_higherbits = (master_irq_addr >> 16) & 0xFFFF;
+    }
+
+/* Unused slave PIC IRQs: IRQ8-15 */
+    /* Unused slave IRQs: IRQ8-15 */
+    for (int i = 0x28; i <= 0x2F; i++) {
+        idt[i].offset_lowerbits = slave_irq_addr & 0xFFFF;
+        idt[i].offset_higherbits = (slave_irq_addr >> 16) & 0xFFFF;
+    }
 	//keyboard IDT
     uint32_t kb_address = (uint32_t)keyboard_isr_asm;
     idt[0x21].offset_lowerbits = kb_address & 0xFFFF;
@@ -80,27 +90,11 @@ void setup_idt() {
     idt[0x2C].offset_lowerbits = mouse_address & 0xFFFF;
     idt[0x2C].offset_higherbits = (mouse_address >> 16) & 0xFFFF;
 
-    uint32_t master_irq_addr = (uint32_t)default_master_irq;
-    uint32_t slave_irq_addr = (uint32_t)default_slave_irq;
-
-/* Unused master IRQs: IRQ3-7 */
-    for (int i = 0x23; i <= 0x27; i++) {
-        idt[i].offset_lowerbits = master_irq_addr & 0xFFFF;
-        idt[i].offset_higherbits = (master_irq_addr >> 16) & 0xFFFF;
-    }
-
-/* Unused slave PIC IRQs: IRQ8-15 */
-    /* Unused slave IRQs: IRQ8-15 */
-    for (int i = 0x28; i <= 0x2F; i++) {
-        idt[i].offset_lowerbits = slave_irq_addr & 0xFFFF;
-        idt[i].offset_higherbits = (slave_irq_addr >> 16) & 0xFFFF;
-    }
-
     struct {
         uint16_t limit;
         uint32_t base;
     } __attribute__((packed)) idtr = { sizeof(idt) - 1, (uint32_t)idt };
 
-    asm volatile("lidt %0" : : "m"(idtr));
+    __asm__ __volatile__("lidt %0" : : "m"(idtr));
     debug_put('D', 71); //debug IDT loaded
 }

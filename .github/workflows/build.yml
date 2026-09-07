@@ -1,0 +1,55 @@
+name: Build myOS
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make nasm xorriso mtools grub-pc-bin grub-common clang lld
+
+      - name: Download toolchain
+        run: |
+          mkdir -p "$HOME/opt"
+          curl -fL \
+            -o "$HOME/i386-elf-toolchain.tar.xz" \
+            "https://github.com/reg-ed1t/myos/releases/download/toolchain-v1/i386-elf-toolchain-v1.0.0.tar.xz"
+
+      - name: Extract toolchain
+        run: |
+          tar -xJf "$HOME/i386-elf-toolchain.tar.xz" -C "$HOME/opt"
+
+      - name: Check compiler
+        run: |
+          export PATH="$HOME/opt/cross/bin:$PATH"
+          i386-elf-gcc --version
+          i386-elf-gcc -print-libgcc-file-name
+
+      - name: Build with GCC
+        run: |
+          export PATH="$HOME/opt/cross/bin:$PATH"
+          make all TOOLCHAIN=gcc
+
+      - name: Build with Clang
+        run: |
+          make clean
+          make all TOOLCHAIN=clang
+
+      - name: Upload ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: myos
+          path: |
+            build/myos.iso
+            build/myos.bin
