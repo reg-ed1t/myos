@@ -197,27 +197,65 @@ int unmap_page(void* virt_addr)
 }
 
 // Low-level diagnostic C handler called from exception 14 assembly stub
-void page_fault_handler_c(uint32_t error_code, uint32_t faulting_address) {
-    kprint("PAGE FAULT\n");
+void page_fault_handler_c(
+        uint32_t error_code,
+        uint32_t faulting_address,
+        uint32_t eip,
+        uint32_t cs
+)
+{
+    cli();
 
-    kprint("Address: ");
+    clear();
+
+    kprint("========== PAGE FAULT ==========\n\n");
+
+    kprint("Fault address: ");
     kprint_hex(faulting_address);
     kprint("\n");
 
-    if (error_code & 0x1)
-        kprint("Present: yes (protection violation)\n");
-    else{
-		kprint("Present: no\n");}
+    kprint("Instruction:   ");
+    kprint_hex(eip);
+    kprint("\n");
 
-    if (error_code & 0x2){
-        kprint("Access: write\n");}
-    else{
-        kprint("Access: read\n");}
+    kprint("Code segment:  ");
+    kprint_hex(cs);
+    kprint("\n");
 
-    if (error_code & 0x4){
-        kprint("Mode: user\n");}
-    else{
-        kprint("Mode: kernel\n");}
-	
-	while(1) { hlt(); }
+    kprint("Error code:    ");
+    kprint_hex(error_code);
+    kprint("\n\n");
+
+    if (error_code & 0x01) {
+        kprint("Cause: protection violation\n");
+    } else {
+        kprint("Cause: non-present page\n");
+    }
+
+    if (error_code & 0x02) {
+        kprint("Access: write\n");
+    } else {
+        kprint("Access: read\n");
+    }
+
+    if (error_code & 0x04) {
+        kprint("Privilege: user\n");
+    } else {
+        kprint("Privilege: kernel\n");
+    }
+
+    if (error_code & 0x08) {
+        kprint("Reserved-bit violation: yes\n");
+    }
+
+    if (error_code & 0x10) {
+        kprint("Instruction fetch: yes\n");
+    }
+
+    kprint("\nSystem halted.\n");
+
+    while (1) {
+        hlt();
+    }
 }
+

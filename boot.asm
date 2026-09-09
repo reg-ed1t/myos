@@ -108,16 +108,23 @@ exception_14:
     pusha
 
     mov eax, cr2
-    push eax
+    mov edx, [esp + 32]    ; error code
+    mov ecx, [esp + 36]    ; EIP
+    mov ebx, [esp + 40]    ; CS
 
-    mov eax, [esp + 36]
-    push eax
+    push ebx               ; CS
+    push ecx               ; EIP
+    push edx               ; error code
+    push eax               ; faulting address
 
     call page_fault_handler_c
 
-    add esp, 8
+    add esp, 16
     popa
+
+    ; CPU pushed the original page-fault error code.
     add esp, 4
+
     iret
 
 exception_common:

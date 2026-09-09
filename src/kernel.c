@@ -1,4 +1,5 @@
 #include "kstring.h"
+#include "heap.h"
 #include "vga.h"
 #include "idt.h"
 #include "drivers.h"
@@ -225,6 +226,51 @@ void kernel_main(
     kprint("VMM (Paging) fully online.");
     new_line();
 
+    heap_init();
+
+    void* heap_test_a = kmalloc(64);
+    void* heap_test_b = kmalloc(128);
+    void* heap_test_c = kmalloc(4096);
+
+    if (!heap_test_a ||
+        !heap_test_b ||
+        !heap_test_c) {
+
+        kprint("FATAL: kernel heap allocation failed.");
+        new_line();
+
+        cli();
+
+        while (1) {
+            hlt();
+        }
+    }
+
+    kprint("Kernel heap allocation test passed.");
+    new_line();
+
+    kfree(heap_test_b);
+
+    void* heap_test_d = kmalloc(96);
+
+    if (!heap_test_d) {
+        kprint("FATAL: kernel heap reuse test failed.");
+        new_line();
+
+        cli();
+
+        while (1) {
+            hlt();
+        }
+    }
+
+    kprint("Kernel heap reuse test passed.");
+    new_line();
+
+    kfree(heap_test_a);
+    kfree(heap_test_c);
+    kfree(heap_test_d);
+
 
     /*
      * Allocate a physical frame for the VMM test.
@@ -243,25 +289,6 @@ void kernel_main(
             hlt();
         }
     }
-
-
-    if (!map_page(
-            phys_frame,
-            (void*)0xC0000000,
-            PAGE_PRESENT | PAGE_RW)) {
-
-        kprint("FATAL: VMM mapping failed.");
-        new_line();
-
-        pmm_free_block(phys_frame);
-
-        cli();
-
-        while (1) {
-            hlt();
-        }
-    }
-
 
     uint32_t* test_ptr =
             (uint32_t*)0xC0000000;
