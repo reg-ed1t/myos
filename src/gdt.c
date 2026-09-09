@@ -21,11 +21,11 @@ void setup_gdt(void) {
     gdt_p.limit = (sizeof(struct GDT_entry) * 3) - 1;
     gdt_p.base  = (uint32_t)&gdt;
 
-    // 1. Null descriptor
+    //Null descriptor
     set_gdt_gate(0, 0, 0, 0, 0);
-    // 2. Code segment (Base: 0, Limit: 4GB, Access: Code, Granularity: 4KB blocks, 32-bit)
+    //Code segment (Base: 0, Limit: 4GB, Access: Code, Granularity: 4KB blocks, 32-bit)
     set_gdt_gate(1, 0, 0xFFFFFFFF, 0x9A, 0xCF);
-    // 3. Data segment (Base: 0, Limit: 4GB, Access: Data, Granularity: 4KB blocks, 32-bit)
+    //Data segment (Base: 0, Limit: 4GB, Access: Data, Granularity: 4KB blocks, 32-bit)
     set_gdt_gate(2, 0, 0xFFFFFFFF, 0x92, 0xCF);
 
     gdt_flush((uint32_t)&gdt_p);

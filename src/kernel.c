@@ -14,36 +14,147 @@ extern void keyboard_isr_asm(void);
 extern uint32_t __kernel_start;
 extern uint32_t __kernel_end;
 
-void kernel_main(
-        uint32_t multiboot_magic,
-        uint32_t multiboot_info_addr
-);
+static void trigger_zero_divide(void)
+{
+    volatile int a = 5;
+    volatile int b = 0;
+    volatile int c = a / b;
+    (void)c;
+}
 
-static void process_command(const volatile char* buffer) {
-    if (kstrcmp(buffer, "help") == 0) {
+
+static void trigger_page_fault(void)
+{
+    volatile uint32_t* ptr = (volatile uint32_t*)0xA0000000;
+
+    *ptr = 0xDEADBEEF;
+}
+
+
+static void trigger_invalid_opcode(void)
+{
+    __asm__ __volatile__("ud2");
+}
+
+
+static void trigger_overflow(void)
+{
+    __asm__ __volatile__("int $4");
+}
+
+
+static void trigger_breakpoint(void)
+{
+    __asm__ __volatile__("int $3");
+}
+
+
+static void trigger_bounds(void)
+{
+    __asm__ __volatile__("int $5");
+}
+
+void kernel_main(uint32_t multiboot_magic, uint32_t multiboot_info_addr);
+
+static int command_is(const volatile char* buffer, const char* command)
+{
+    while (*command != '\0') {
+
+        if (*buffer != *command) {
+            return 0;
+        }
+
+        buffer++;
+        command++;
+    }
+
+    return *buffer == '\0' || *buffer == ' ';
+}
+
+static const volatile char* command_argument(const volatile char* buffer)
+{
+    while (*buffer != '\0' && *buffer != ' ') {
+        buffer++;
+    }
+
+    while (*buffer == ' ') {
+        buffer++;
+    }
+
+    return buffer;
+}
+
+static void process_command(const volatile char* buffer)
+{
+    const volatile char* argument;
+
+    if (command_is(buffer, "help")) {
+
         debug_put('C', 75);
-		kprint("help-list all commands. pleased now?\n");
-		kprint("clear-clear the screen. and now?\n");
-		kprint("sleep-cpu halt for some time. and now?\n");
-		kprint("crash-testing a crash. and now?\n");
-		kprint("pcrash-testing a pmm crash. and now?\n");
-		kprint("time-prints the current time. and now?\n");
-		kprint("beep-beep! making beep beep sounds. now you definitely are.");
-    } else if (kstrcmp(buffer, "clear") == 0) {
-		clear();
-    } else if (kstrcmp(buffer, "sleep") == 0) {
-		sleep(200);
-	} else if (kstrcmp(buffer, "pcrash") == 0) {
-		uint32_t* unmapped_ptr = (uint32_t*)0xA0000000;
-		*unmapped_ptr = 123;
-	} else if (kstrcmp(buffer, "crash") == 0) {
-        volatile int a = 5;
-        volatile int b = 0;
-        volatile int c = a / b;
-        (void)c;
-	} else if (kstrcmp(buffer, "time") == 0) {
+
+        kprint("help - list all commands.\n");
+        kprint("clear - clear the screen.\n");
+        kprint("sleep - halt the CPU for some time.\n");
+        kprint("crash - list crash tests.\n");
+        kprint("time - print the current time.\n");
+        kprint("beep - make a beep.\n");
+        kprint("Crash tests:\n");
+        kprint("  crash -zerodivide\n");
+        kprint("  crash -pages\n");
+        kprint("  crash -invalidopcode\n");
+        kprint("  crash -overflow\n");
+        kprint("  crash -breakpoint\n");
+        kprint("  crash -bounds\n");
+
+    } else if (command_is(buffer, "clear")) {
+
+        clear();
+
+    } else if (command_is(buffer, "sleep")) {
+
+        sleep(200);
+
+    } else if (command_is(buffer, "crash")) {
+
+        argument = command_argument(buffer);
+
+        if (*argument == '\0') {
+
+            kprint("Crash tests need an argument.\n");
+
+        } else if (kstrcmp(argument, "-zerodivide") == 0) {
+
+            trigger_zero_divide();
+
+        } else if (kstrcmp(argument, "-pages") == 0) {
+
+            trigger_page_fault();
+
+        } else if (kstrcmp(argument, "-invalidopcode") == 0) {
+
+            trigger_invalid_opcode();
+
+        } else if (kstrcmp(argument, "-overflow") == 0) {
+
+            trigger_overflow();
+
+        } else if (kstrcmp(argument, "-breakpoint") == 0) {
+
+            trigger_breakpoint();
+
+        } else if (kstrcmp(argument, "-bounds") == 0) {
+
+            trigger_bounds();
+
+        } else {
+
+            kprint("unknown crash test\n");
+        }
+
+    } else if (command_is(buffer, "time")) {
+
         read_rtc();
-        
+
         kprint("Current UTC Date/Time: ");
         kprint_int(rtc_year);
         kprint("-");
@@ -56,11 +167,16 @@ static void process_command(const volatile char* buffer) {
         kprint_int(rtc_minute);
         kprint(":");
         kprint_int(rtc_second);
-	} else if (kstrcmp(buffer, "beep") == 0) {
+
+    } else if (command_is(buffer, "beep")) {
+
         kprint("Beeping...");
-        beep(750, 200); // 750 Hz tone for 20 ticks (approx 200ms at 100Hz PIT clock)
-	} else{
-		kprint("unknown command");}
+        beep(750, 200);
+
+    } else {
+
+        kprint("unknown command\n");
+    }
 }
 
 int old_grid_x = 0;
@@ -101,12 +217,9 @@ void kernel_main(
 
     debug_put('P', 72);
 
-    /*
-     * Remap the PIC:
-     *
-     * Master IRQs -> vectors 0x20-0x27
-     * Slave IRQs  -> vectors 0x28-0x2F
-     */
+    /*Remap the PIC
+    Master IRQs -> vectors 0x20-0x27
+    Slave IRQs  -> vectors 0x28-0x2F*/
     outb(0x20, 0x11);
     outb(0xA0, 0x11);
 
@@ -147,10 +260,7 @@ void kernel_main(
         }
     }
 
-
-    /*
-     * Initialize PMM from the actual Multiboot memory map.
-     */
+    //Initialize PMM from the actual Multiboot memory map
     multiboot_info_t* mbi =
             (multiboot_info_t*)multiboot_info_addr;
 
@@ -173,15 +283,20 @@ void kernel_main(
     new_line();
 
 
-    /*
-     * Basic PMM allocation test.
-     */
+    //Basic PMM allocation test.
     void* block1 = pmm_alloc_block();
 
     if (!block1) {
 
-        kprint("FATAL: PMM allocation failed (block1).");
-        new_line();
+        kprint("FATAL: PMM allocation failed (block1).\n");
+
+        kprint("PMM blocks: ");
+        kprint_int(pmm_max_blocks);
+        kprint("\n");
+
+        kprint("PMM bitmap: ");
+        kprint_hex((uint32_t)pmm_bitmap);
+        kprint("\n");
 
         cli();
 
@@ -208,9 +323,7 @@ void kernel_main(
     }
 
 
-    /*
-     * Initialize virtual memory.
-     */
+    //Initialize virtual memory
     if (!init_vmm()) {
 
         kprint("FATAL: VMM initialization failed.");
@@ -272,15 +385,12 @@ void kernel_main(
     kfree(heap_test_d);
 
 
-    /*
-     * Allocate a physical frame for the VMM test.
-     */
-    void* phys_frame =
-            pmm_alloc_block();
+    //Allocate a physical frame for the VMM test
+    void* phys_frame = pmm_alloc_block();
 
     if (!phys_frame) {
 
-        kprint("FATAL: PMM allocation failed (VMM test frame).");
+        kprint("FATAL: PMM allocation failed (VMM test frame).\n");
         new_line();
 
         cli();
@@ -290,25 +400,32 @@ void kernel_main(
         }
     }
 
-    uint32_t* test_ptr =
-            (uint32_t*)0xC0000000;
+    uint32_t* test_ptr = (uint32_t*)0xC0000000;
+
+    if (!map_page(phys_frame, test_ptr, PAGE_RW)) {
+
+        kprint("FATAL: VMM map test failed.\n");
+        new_line();
+
+        pmm_free_block(phys_frame);
+
+        cli();
+
+        while (1) {
+            hlt();
+        }
+    }
 
     *test_ptr = 0xDEADBEEF;
 
     if (*test_ptr == 0xDEADBEEF) {
-
-        kprint(
-                "Virtual Memory Test Passed! "
-                "Mapped 0xC0000000 successfully."
-        );
-
+        kprint("Virtual Memory Test Passed!""Mapped 0xC0000000 successfully.");
         new_line();
     }
-    /*
-    * Test unmapping the page.
-    */
+
     if (!unmap_page((void*)0xC0000000)) {
-        kprint("FATAL: VMM unmap test failed.");
+
+        kprint("FATAL: VMM unmap test failed.\n");
         new_line();
 
         cli();
@@ -317,6 +434,8 @@ void kernel_main(
             hlt();
         }
     }
+
+    pmm_free_block(phys_frame);
 
     kprint("Virtual Memory Test Passed! Unmapped 0xC0000000 successfully.");
     new_line();

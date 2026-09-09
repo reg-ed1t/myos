@@ -5,8 +5,6 @@
 #define cli()  __asm__ __volatile__("cli")
 #define sti()  __asm__ __volatile__("sti")
 
-#define pause() __asm__ __volatile__("pause")
-
 #include <stdint.h>
 
 static inline uint8_t inb(uint16_t port) {

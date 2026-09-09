@@ -3,18 +3,14 @@
 
 #include <stdint.h>
 
-/*
- * Page Entry Attributes
- */
+//Page Entry Attributes
 #define PAGE_PRESENT        0x001
 #define PAGE_RW             0x002
 #define PAGE_USER           0x004
 #define PAGE_WRITE_THROUGH  0x008
 #define PAGE_CACHE_DISABLE  0x010
 
-/*
- * Virtual address-space layout.
- */
+//Virtual address-space layout
 #define VMM_LOW_START       0x00000000
 #define VMM_LOW_END         0x01000000
 
@@ -32,9 +28,7 @@
 
 #define RECURSIVE_PD_INDEX  1023
 
-/*
- * Index extraction helpers.
- */
+//Index extraction helpers.
 #define PAGE_DIRECTORY_INDEX(x) (((x) >> 22) & 0x3FF)
 #define PAGE_TABLE_INDEX(x)     (((x) >> 12) & 0x3FF)
 #define PAGE_ALIGN(x)           ((x) & ~0xFFFU)
@@ -51,12 +45,5 @@ int map_page(
 );
 
 int unmap_page(void* virt_addr);
-
-void page_fault_handler_c(
-        uint32_t error_code,
-        uint32_t faulting_address,
-        uint32_t eip,
-        uint32_t cs
-);
 
 #endif

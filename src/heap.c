@@ -139,9 +139,7 @@ void heap_init(void)
     heap_head = 0;
     heap_current_end = KERNEL_HEAP_START;
 
-    /*
-     * Start with one page.
-     */
+    //Start with one page
     if (!heap_grow(HEAP_PAGE_SIZE)) {
         kprint("HEAP: failed to initialize\n");
         return;
