@@ -35,7 +35,7 @@ LDFLAGS = $(LDFLAGS_TOOLCHAIN) -nostdlib -T linker.ld
 BUILD_DIR = build
 OBJ_DIR = $(BUILD_DIR)/obj
 
-C_SOURCES = src/kernel.c src/vga.c src/idt.c src/gdt.c src/drivers.c src/pmm.c src/vmm.c
+C_SOURCES = $(wildcard src/*.c)
 C_OBJS = $(patsubst src/%.c, $(OBJ_DIR)/%.o, $(C_SOURCES))
 BOOT_OBJ = $(OBJ_DIR)/boot.o
 

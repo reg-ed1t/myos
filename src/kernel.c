@@ -1,4 +1,4 @@
-#include "string.h"
+#include "kstring.h"
 #include "vga.h"
 #include "idt.h"
 #include "drivers.h"
@@ -9,18 +9,17 @@
 
 extern void timer_isr_asm(void);
 extern void keyboard_isr_asm(void);
-void kernel_main(void);
 
-int str_compare(const volatile char* s1, const char* s2) {
-    while (*s1 && (*s1 == *s2)) {
-        s1++;
-        s2++;
-    }
-    return *(const unsigned char*)s1 - *(const unsigned char*)s2;
-}
+extern uint32_t __kernel_start;
+extern uint32_t __kernel_end;
+
+void kernel_main(
+        uint32_t multiboot_magic,
+        uint32_t multiboot_info_addr
+);
 
 static void process_command(const volatile char* buffer) {
-    if (str_compare(buffer, "help") == 0) {
+    if (kstrcmp(buffer, "help") == 0) {
         debug_put('C', 75);
 		kprint("help-list all commands. pleased now?\n");
 		kprint("clear-clear the screen. and now?\n");
@@ -29,19 +28,19 @@ static void process_command(const volatile char* buffer) {
 		kprint("pcrash-testing a pmm crash. and now?\n");
 		kprint("time-prints the current time. and now?\n");
 		kprint("beep-beep! making beep beep sounds. now you definitely are.");
-    } else if (str_compare(buffer, "clear") == 0) {
+    } else if (kstrcmp(buffer, "clear") == 0) {
 		clear();
-    } else if (str_compare(buffer, "sleep") == 0) {
+    } else if (kstrcmp(buffer, "sleep") == 0) {
 		sleep(200);
-	} else if (str_compare(buffer, "pcrash") == 0) {
+	} else if (kstrcmp(buffer, "pcrash") == 0) {
 		uint32_t* unmapped_ptr = (uint32_t*)0xA0000000;
 		*unmapped_ptr = 123;
-	} else if (str_compare(buffer, "crash") == 0) {
+	} else if (kstrcmp(buffer, "crash") == 0) {
         volatile int a = 5;
         volatile int b = 0;
         volatile int c = a / b;
         (void)c;
-	} else if (str_compare(buffer, "time") == 0) {
+	} else if (kstrcmp(buffer, "time") == 0) {
         read_rtc();
         
         kprint("Current UTC Date/Time: ");
@@ -56,7 +55,7 @@ static void process_command(const volatile char* buffer) {
         kprint_int(rtc_minute);
         kprint(":");
         kprint_int(rtc_second);
-	} else if (str_compare(buffer, "beep") == 0) {
+	} else if (kstrcmp(buffer, "beep") == 0) {
         kprint("Beeping...");
         beep(750, 200); // 750 Hz tone for 20 ticks (approx 200ms at 100Hz PIT clock)
 	} else{
@@ -87,101 +86,219 @@ static void update_mouse_pointer(void) {
     old_grid_y = current_grid_y;
 }
 
-void kernel_main(void) {
-	clear();
+void kernel_main(
+        uint32_t multiboot_magic,
+        uint32_t multiboot_info_addr
+)
+{
+    clear();
 
-    debug_put('M', 69); //debug main started
-	
-	setup_gdt();
+    debug_put('M', 69);
+
+    setup_gdt();
     setup_idt();
-    
-    debug_put('P', 72); //debug PIC remapping start
+
+    debug_put('P', 72);
+
+    /*
+     * Remap the PIC:
+     *
+     * Master IRQs -> vectors 0x20-0x27
+     * Slave IRQs  -> vectors 0x28-0x2F
+     */
     outb(0x20, 0x11);
     outb(0xA0, 0x11);
+
     outb(0x21, 0x20);
     outb(0xA1, 0x28);
+
     outb(0x21, 0x04);
     outb(0xA1, 0x02);
+
     outb(0x21, 0x01);
     outb(0xA1, 0x01);
-	
-	// Initialize PMM to track 32MB of RAM, placing the bitmap array at 0x400000 (4MB)
-    pmm_init(32 * 1024 * 1024, 0x400000);
 
-    // Free up the available memory region for general allocation use (e.g., from 5MB to 32MB)
-    pmm_init_region(0x500000, 27 * 1024 * 1024);
+
+    /*
+     * Verify that GRUB actually gave us Multiboot data.
+     */
+    if (multiboot_magic != MULTIBOOT_BOOTLOADER_MAGIC) {
+
+        kprint("FATAL: invalid Multiboot magic.");
+        new_line();
+
+        cli();
+
+        while (1) {
+            hlt();
+        }
+    }
+
+    if (multiboot_info_addr == 0) {
+
+        kprint("FATAL: invalid Multiboot info pointer.");
+        new_line();
+
+        cli();
+
+        while (1) {
+            hlt();
+        }
+    }
+
+
+    /*
+     * Initialize PMM from the actual Multiboot memory map.
+     */
+    multiboot_info_t* mbi =
+            (multiboot_info_t*)multiboot_info_addr;
+
+    if (!pmm_init_multiboot(
+            mbi,
+            (uint32_t)&__kernel_start,
+            (uint32_t)&__kernel_end)) {
+
+        kprint("FATAL: PMM initialization failed.");
+        new_line();
+
+        cli();
+
+        while (1) {
+            hlt();
+        }
+    }
 
     kprint("Physical Memory Manager online.");
     new_line();
+
+
+    /*
+     * Basic PMM allocation test.
+     */
     void* block1 = pmm_alloc_block();
+
     if (!block1) {
+
         kprint("FATAL: PMM allocation failed (block1).");
         new_line();
+
         cli();
+
         while (1) {
             hlt();
         }
     }
+
 
     void* block2 = pmm_alloc_block();
+
     if (!block2) {
+
         kprint("FATAL: PMM allocation failed (block2).");
         new_line();
+
         pmm_free_block(block1);
-        hlt();
+
+        cli();
+
         while (1) {
             hlt();
         }
     }
 
+
+    /*
+     * Initialize virtual memory.
+     */
     if (!init_vmm()) {
+
         kprint("FATAL: VMM initialization failed.");
         new_line();
-        hlt();
+
+        cli();
+
         while (1) {
             hlt();
         }
     }
+
     kprint("VMM (Paging) fully online.");
     new_line();
 
-    void* phys_frame = pmm_alloc_block();
+
+    /*
+     * Allocate a physical frame for the VMM test.
+     */
+    void* phys_frame =
+            pmm_alloc_block();
 
     if (!phys_frame) {
+
         kprint("FATAL: PMM allocation failed (VMM test frame).");
         new_line();
+
         cli();
+
         while (1) {
             hlt();
         }
     }
 
-    if (!map_page(phys_frame,
-                  (void*)0xC0000000,
-                  PAGE_PRESENT | PAGE_RW)) {
+
+    if (!map_page(
+            phys_frame,
+            (void*)0xC0000000,
+            PAGE_PRESENT | PAGE_RW)) {
+
         kprint("FATAL: VMM mapping failed.");
         new_line();
 
         pmm_free_block(phys_frame);
+
         cli();
+
         while (1) {
             hlt();
         }
     }
-    // Test writing to the virtual address
-    uint32_t* test_ptr = (uint32_t*)0xC0000000;
+
+
+    uint32_t* test_ptr =
+            (uint32_t*)0xC0000000;
+
     *test_ptr = 0xDEADBEEF;
 
     if (*test_ptr == 0xDEADBEEF) {
-        kprint("Virtual Memory Test Passed! Mapped 0xC0000000 successfully.");
+
+        kprint(
+                "Virtual Memory Test Passed! "
+                "Mapped 0xC0000000 successfully."
+        );
+
         new_line();
     }
-	init_timer(100);
-	
-	init_mouse();
-	
-    // mask everything except IRQ1
-	outb(0x21, 0xF8); 	
+    /*
+    * Test unmapping the page.
+    */
+    if (!unmap_page((void*)0xC0000000)) {
+        kprint("FATAL: VMM unmap test failed.");
+        new_line();
+
+        cli();
+
+        while (1) {
+            hlt();
+        }
+    }
+
+    kprint("Virtual Memory Test Passed! Unmapped 0xC0000000 successfully.");
+    new_line();
+
+    init_timer(100);
+
+    init_mouse();
+
+    outb(0x21, 0xF8);
     outb(0xA1, 0xEF);
 
     kprint("system up.");

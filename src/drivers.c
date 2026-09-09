@@ -42,9 +42,12 @@ void timer_handler(void) {
 
 void sleep(uint32_t ticks) {
 	uint32_t start = timer_ticks;
-    cli();
-	while ((uint32_t)(timer_ticks - start) < ticks)
+	while ((uint32_t)(timer_ticks - start) < ticks){
+        sti();
 		hlt();
+        cli();
+    }
+    sti();
 }
 
 void keyboard_handler(void) {

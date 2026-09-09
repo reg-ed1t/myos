@@ -103,18 +103,97 @@ int map_page(void* phys_addr, void* virt_addr, uint32_t flags)
     return 1;
 }
 
-void unmap_page(void* virt_addr) {
-    uint32_t vaddr = (uint32_t)virt_addr;
-    uint32_t pd_idx = PAGE_DIRECTORY_INDEX(vaddr);
-    uint32_t pt_idx = PAGE_TABLE_INDEX(vaddr);
+int unmap_page(void* virt_addr)
+{
+    uint32_t vaddr =
+            (uint32_t)virt_addr;
 
-    uint32_t* pd = (uint32_t*)VMM_PAGE_DIR_BASE;
+    uint32_t pd_idx =
+            PAGE_DIRECTORY_INDEX(vaddr);
 
-    if (pd[pd_idx] & PAGE_PRESENT) {
-        uint32_t* pt = (uint32_t*)(VMM_PAGE_TABLE_BASE + (pd_idx * 4096));
-        pt[pt_idx] = 0; // Mark page NOT PRESENT
-        invalidate_tlb_asm(vaddr);
+    uint32_t pt_idx =
+            PAGE_TABLE_INDEX(vaddr);
+
+    /*
+     * The recursive page-directory entry is special.
+     * Never allow it to be unmapped through this function.
+     */
+    if (pd_idx == RECURSIVE_PD_INDEX) {
+        return 0;
     }
+
+    uint32_t* pd =
+            (uint32_t*)VMM_PAGE_DIR_BASE;
+
+    /*
+     * No page table exists for this virtual address.
+     */
+    if (!(pd[pd_idx] & PAGE_PRESENT)) {
+        return 0;
+    }
+
+    uint32_t* pt =
+            (uint32_t*)
+                    (VMM_PAGE_TABLE_BASE +
+                     (pd_idx * 4096));
+
+    /*
+     * The page is already unmapped.
+     */
+    if (!(pt[pt_idx] & PAGE_PRESENT)) {
+        return 0;
+    }
+
+    /*
+     * Remove the PTE first.
+     */
+    pt[pt_idx] = 0;
+
+    /*
+     * Make sure the CPU no longer has the old translation.
+     */
+    invalidate_tlb_asm(vaddr);
+
+
+    /*
+     * Check whether the page table is now completely empty.
+     */
+    for (int i = 0; i < 1024; i++) {
+
+        if (pt[i] & PAGE_PRESENT) {
+            return 1;
+        }
+    }
+
+
+    /*
+     * Nothing is using this page table anymore.
+     *
+     * Save its physical address before clearing the PDE.
+     */
+    uint32_t pt_phys =
+            pd[pd_idx] & ~0xFFFU;
+
+    /*
+     * Remove the page-directory entry.
+     */
+    pd[pd_idx] = 0;
+
+    /*
+     * The recursive page-table virtual address now
+     * refers to an unmapped page, so invalidate it too.
+     */
+    invalidate_tlb_asm(
+            VMM_PAGE_TABLE_BASE +
+            (pd_idx * 4096)
+    );
+
+    /*
+     * Return the now-unused page table to the PMM.
+     */
+    pmm_free_block((void*)pt_phys);
+
+    return 1;
 }
 
 // Low-level diagnostic C handler called from exception 14 assembly stub
