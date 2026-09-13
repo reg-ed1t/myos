@@ -17,7 +17,6 @@ _start:
     ; Multiboot:
     ; EAX = bootloader magic
     ; EBX = pointer to Multiboot information structure
-    ;
     ; kernel_main(magic, multiboot_info)
 
     push ebx
@@ -70,7 +69,6 @@ gdt_flush:
 
 .flush:
     ret
-
 
 ; CPU EXCEPTIONS
 global exception_0
@@ -207,7 +205,6 @@ exception_30:
     jmp exception_common
 
 ; After pusha:
-;
 ;   esp + 0   = EDI
 ;   esp + 4   = ESI
 ;   esp + 8   = EBP
@@ -297,7 +294,6 @@ mouse_isr_asm:
     call mouse_handler
     popa
     iret
-
 
 section .bss
 

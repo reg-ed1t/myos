@@ -10,6 +10,8 @@
 
 extern void timer_isr_asm(void);
 extern void keyboard_isr_asm(void);
+extern void enter_user_mode(uint32_t entry, uint32_t user_stack);
+extern uint32_t stack_top;   // from boot.asm
 
 extern uint32_t __kernel_start;
 extern uint32_t __kernel_end;
@@ -105,6 +107,7 @@ static void process_command(const volatile char* buffer)
         kprint("  crash -overflow\n");
         kprint("  crash -breakpoint\n");
         kprint("  crash -bounds\n");
+        kprint("ring3 - enter user mode (ring 3)\n");
 
     } else if (command_is(buffer, "clear")) {
 
@@ -172,7 +175,8 @@ static void process_command(const volatile char* buffer)
 
         kprint("Beeping...");
         beep(750, 200);
-
+    } else if (command_is(buffer, "ring3")) {
+        ;
     } else {
 
         kprint("unknown command\n");
@@ -419,7 +423,7 @@ void kernel_main(
     *test_ptr = 0xDEADBEEF;
 
     if (*test_ptr == 0xDEADBEEF) {
-        kprint("Virtual Memory Test Passed!""Mapped 0xC0000000 successfully.");
+        kprint("Virtual Memory Test Passed! Mapped 0xC0000000 successfully.");
         new_line();
     }
 
