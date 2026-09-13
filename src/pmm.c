@@ -300,3 +300,26 @@ void pmm_free_block(void* p)
 
     pmm_bitmap_unset(block);
 }
+
+uint32_t pmm_get_total_blocks(void)
+{
+    return pmm_max_blocks;
+}
+
+uint32_t pmm_get_used_blocks(void)
+{
+    uint32_t used = 0;
+
+    for (uint32_t i = 0; i < pmm_max_blocks; i++) {
+        if (pmm_bitmap_test(i)) {
+            used++;
+        }
+    }
+
+    return used;
+}
+
+uint32_t pmm_get_free_blocks(void)
+{
+    return pmm_get_total_blocks() - pmm_get_used_blocks();
+}

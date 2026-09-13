@@ -76,4 +76,8 @@ int pmm_init_multiboot(
 void* pmm_alloc_block(void);
 void pmm_free_block(void* p);
 
+uint32_t pmm_get_total_blocks(void);
+uint32_t pmm_get_used_blocks(void);
+uint32_t pmm_get_free_blocks(void);
+
 #endif

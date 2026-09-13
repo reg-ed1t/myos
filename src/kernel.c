@@ -107,7 +107,8 @@ static void process_command(const volatile char* buffer)
         kprint("  crash -overflow\n");
         kprint("  crash -breakpoint\n");
         kprint("  crash -bounds\n");
-        kprint("ring3 - enter user mode (ring 3)\n");
+        kprint("mem - show physical memory usage\n");
+        kprint("reboot - reboot the system\n");
 
     } else if (command_is(buffer, "clear")) {
 
@@ -175,8 +176,44 @@ static void process_command(const volatile char* buffer)
 
         kprint("Beeping...");
         beep(750, 200);
-    } else if (command_is(buffer, "ring3")) {
-        ;
+    } else if (command_is(buffer, "mem")) {
+
+        uint32_t total = pmm_get_total_blocks();
+        uint32_t used  = pmm_get_used_blocks();
+        uint32_t free  = pmm_get_free_blocks();
+
+        kprint("Physical memory:\n");
+        kprint("  Total: ");
+        kprint_int(total);
+        kprint(" blocks (");
+        kprint_int(total * 4);
+        kprint(" KB)\n");
+
+        kprint("  Used:  ");
+        kprint_int(used);
+        kprint(" blocks (");
+        kprint_int(used * 4);
+        kprint(" KB)\n");
+
+        kprint("  Free:  ");
+        kprint_int(free);
+        kprint(" blocks (");
+        kprint_int(free * 4);
+        kprint(" KB)\n");
+    } else if (command_is(buffer, "reboot")) {
+
+        kprint("Rebooting...\n");
+
+        // Wait until keyboard controller input buffer is empty
+        while (inb(0x64) & 0x02)
+            ;
+
+        outb(0x64, 0xFE);   // pulse reset line
+
+        // Fallback: triple fault
+        uint16_t empty_idt[3] = {0, 0, 0};
+        __asm__ __volatile__("lidt %0" : : "m"(empty_idt));
+        __asm__ __volatile__("int $0");
     } else {
 
         kprint("unknown command\n");
