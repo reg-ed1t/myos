@@ -70,6 +70,42 @@ gdt_flush:
 .flush:
     ret
 
+; TSS
+global tss_flush
+tss_flush:
+    mov ax, 0x28
+    ltr ax
+    ret
+
+; Enter user mode
+; void enter_user_mode(uint32_t entry, uint32_t user_esp);
+; void enter_user_mode(uint32_t entry, uint32_t user_esp);
+global enter_user_mode
+enter_user_mode:
+    cli                         ; keep interrupts off until we are in user mode
+
+    mov eax, [esp + 4]          ; entry point
+    mov ebx, [esp + 8]          ; user stack
+
+    ; Load user data segments
+    mov cx, 0x23                ; RPL = 3
+    mov ds, cx
+    mov es, cx
+    mov fs, cx
+    mov gs, cx
+
+    ; Build the iret stack frame (bottom to top)
+    push 0x23                   ; SS  (user data)
+    push ebx                    ; ESP (user stack)
+    pushf                       ; EFLAGS
+    pop ecx
+    or ecx, 0x200               ; set IF (interrupts enabled in user mode)
+    push ecx                    ; push modified EFLAGS
+    push 0x1B                   ; CS  (user code, RPL=3)
+    push eax                    ; EIP
+
+    iret                        ; jump to ring 3 – never returns
+
 ; CPU EXCEPTIONS
 global exception_0
 global exception_1
@@ -298,6 +334,8 @@ mouse_isr_asm:
 section .bss
 
 align 16
+
+global stack_top
 
 stack_bottom:
     resb 16384

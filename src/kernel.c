@@ -7,11 +7,12 @@
 #include "gdt.h"
 #include "pmm.h"
 #include "vmm.h"
+#include "user.h"
 
 extern void timer_isr_asm(void);
 extern void keyboard_isr_asm(void);
-extern void enter_user_mode(uint32_t entry, uint32_t user_stack);
-extern uint32_t stack_top;   // from boot.asm
+extern void enter_user_mode(uint32_t entry, uint32_t user_esp);
+extern uint32_t stack_top;
 
 extern uint32_t __kernel_start;
 extern uint32_t __kernel_end;
@@ -109,6 +110,7 @@ static void process_command(const volatile char* buffer)
         kprint("  crash -bounds\n");
         kprint("mem - show physical memory usage\n");
         kprint("reboot - reboot the system\n");
+        kprint("ring3 - enter user mode\n");
 
     } else if (command_is(buffer, "clear")) {
 
@@ -176,6 +178,7 @@ static void process_command(const volatile char* buffer)
 
         kprint("Beeping...");
         beep(750, 200);
+
     } else if (command_is(buffer, "mem")) {
 
         uint32_t total = pmm_get_total_blocks();
@@ -200,20 +203,9 @@ static void process_command(const volatile char* buffer)
         kprint(" blocks (");
         kprint_int(free * 4);
         kprint(" KB)\n");
-    } else if (command_is(buffer, "reboot")) {
 
-        kprint("Rebooting...\n");
-
-        // Wait until keyboard controller input buffer is empty
-        while (inb(0x64) & 0x02)
-            ;
-
-        outb(0x64, 0xFE);   // pulse reset line
-
-        // Fallback: triple fault
-        uint16_t empty_idt[3] = {0, 0, 0};
-        __asm__ __volatile__("lidt %0" : : "m"(empty_idt));
-        __asm__ __volatile__("int $0");
+    } else if (command_is(buffer, "ring3")) {
+        enter_ring3();
     } else {
 
         kprint("unknown command\n");
@@ -489,23 +481,23 @@ void kernel_main(
     outb(0xA1, 0xEF);
 
     kprint("system up.");
-    
+
     sym = ((sym / 160) + 1) * 160;
     update_cursor(sym / 2);
 
-	debug_put('s', 73); // debug STI
+    debug_put('s', 73); // debug STI
     sti();
 
     // Infinite kernel execution loop
     while(1) {
         if (command_ready) {
-			set_cell_color(old_grid_x, old_grid_y, (VGA_C_BLUE << 4) | VGA_C_WHITE);
+            set_cell_color(old_grid_x, old_grid_y, (VGA_C_BLUE << 4) | VGA_C_WHITE);
             process_command(command_buffer);
-			new_line();
+            new_line();
             command_len = 0;
             command_ready = 0;
         }
-		update_mouse_pointer();
+        update_mouse_pointer();
         hlt();
     }
 }
