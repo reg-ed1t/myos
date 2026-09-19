@@ -204,6 +204,21 @@ static void process_command(const volatile char* buffer)
         kprint_int(free * 4);
         kprint(" KB)\n");
 
+    } else if (command_is(buffer, "reboot")) {
+
+        kprint("Rebooting...\n");
+
+        // Wait until keyboard controller input buffer is empty
+        while (inb(0x64) & 0x02)
+            ;
+
+        outb(0x64, 0xFE);   // pulse reset line
+
+        // Fallback: triple fault
+        uint16_t empty_idt[3] = {0, 0, 0};
+        __asm__ __volatile__("lidt %0" : : "m"(empty_idt));
+        __asm__ __volatile__("int $0");
+
     } else if (command_is(buffer, "ring3")) {
         enter_ring3();
     } else {
