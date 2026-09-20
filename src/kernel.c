@@ -11,8 +11,6 @@
 
 extern void timer_isr_asm(void);
 extern void keyboard_isr_asm(void);
-extern void enter_user_mode(uint32_t entry, uint32_t user_esp);
-extern uint32_t stack_top;
 
 extern uint32_t __kernel_start;
 extern uint32_t __kernel_end;

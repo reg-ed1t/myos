@@ -119,9 +119,9 @@ void read_rtc(void) {
 
     rtc_second = get_cmos_register(0x00);
     rtc_minute = get_cmos_register(0x02);
-    rtc_hour   = get_cmos_register(0x04);
-    rtc_day    = get_cmos_register(0x07);
-    rtc_month  = get_cmos_register(0x08);
+    rtc_hour = get_cmos_register(0x04);
+    rtc_day = get_cmos_register(0x07);
+    rtc_month = get_cmos_register(0x08);
     uint32_t year_short = get_cmos_register(0x09);
 
     //convert
@@ -129,9 +129,9 @@ void read_rtc(void) {
     if (!(register_b & 0x04)) {
         rtc_second = (rtc_second & 0x0F) + ((rtc_second / 16) * 10);
         rtc_minute = (rtc_minute & 0x0F) + ((rtc_minute / 16) * 10);
-        rtc_hour   = ((rtc_hour & 0x0F) + (((rtc_hour & 0x70) / 16) * 10)) | (rtc_hour & 0x80);
-        rtc_day    = (rtc_day & 0x0F) + ((rtc_day / 16) * 10);
-        rtc_month  = (rtc_month & 0x0F) + ((rtc_month / 16) * 10);
+        rtc_hour = ((rtc_hour & 0x0F) + (((rtc_hour & 0x70) / 16) * 10)) | (rtc_hour & 0x80);
+        rtc_day = (rtc_day & 0x0F) + ((rtc_day / 16) * 10);
+        rtc_month = (rtc_month & 0x0F) + ((rtc_month / 16) * 10);
         year_short = (year_short & 0x0F) + ((year_short / 16) * 10);
     }
 

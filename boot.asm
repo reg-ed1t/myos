@@ -36,7 +36,17 @@ extern keyboard_handler
 
 keyboard_isr_asm:
     pusha
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
     call keyboard_handler
+    mov ax, 0x23
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
     popa
     iret
 
@@ -46,9 +56,66 @@ extern timer_handler
 
 timer_isr_asm:
     pusha
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
     call timer_handler
+    mov ax, 0x23
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
     popa
     iret
+
+; Mouse
+global mouse_isr_asm
+extern mouse_handler
+mouse_isr_asm:
+    pusha
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    call mouse_handler
+    mov ax, 0x23
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    popa
+    iret
+
+; System calls
+global syscall_isr_asm
+extern syscall_handler
+
+syscall_isr_asm:
+    pusha
+
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    push esp
+    call syscall_handler
+    add esp, 4
+
+    mov [esp + 28], eax
+
+    mov ax, 0x23
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    popa
+    iretd
 
 ; GDT
 global gdt_flush
@@ -82,29 +149,23 @@ tss_flush:
 ; void enter_user_mode(uint32_t entry, uint32_t user_esp);
 global enter_user_mode
 enter_user_mode:
-    cli                         ; keep interrupts off until we are in user mode
+    cli
+    mov eax, [esp + 4]
+    mov ebx, [esp + 8]
 
-    mov eax, [esp + 4]          ; entry point
-    mov ebx, [esp + 8]          ; user stack
-
-    ; Load user data segments
-    mov cx, 0x23                ; RPL = 3
+    mov cx, 0x23
     mov ds, cx
     mov es, cx
     mov fs, cx
     mov gs, cx
 
-    ; Build the iret stack frame (bottom to top)
-    push 0x23                   ; SS  (user data)
-    push ebx                    ; ESP (user stack)
-    pushf                       ; EFLAGS
-    pop ecx
-    or ecx, 0x200               ; set IF (interrupts enabled in user mode)
-    push ecx                    ; push modified EFLAGS
-    push 0x1B                   ; CS  (user code, RPL=3)
-    push eax                    ; EIP
-
-    iret                        ; jump to ring 3 – never returns
+    push 0x23
+    push ebx
+    pushfd
+    or dword [esp], 0x200
+    push 0x1B
+    push eax
+    iretd
 
 ; CPU EXCEPTIONS
 global exception_0
@@ -317,17 +378,6 @@ default_slave_irq:
     out 0xA0, al
     out 0x20, al
 
-    popa
-    iret
-
-
-; Mouse
-global mouse_isr_asm
-extern mouse_handler
-
-mouse_isr_asm:
-    pusha
-    call mouse_handler
     popa
     iret
 

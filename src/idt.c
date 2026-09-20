@@ -1,6 +1,7 @@
 #include "idt.h"
 #include "vga.h"
 #include "io.h"
+#include "syscall.h"
 #include "drivers.h"
 
 struct IDT_entry idt[256];
@@ -10,6 +11,7 @@ struct IDT_entry idt[256];
 extern void keyboard_isr_asm(void);
 extern void timer_isr_asm(void);
 extern void mouse_isr_asm(void);
+extern void syscall_isr_asm(void);
 
 extern void dummy_isr(void);
 extern void default_master_irq(void);
@@ -76,18 +78,13 @@ static const char* exception_names[32] = {
 };
 
 
-static void set_gate(
-        int number,
-        void (*handler)(void)
-)
+static void set_gate(int number, void (*handler)(void))
 {
     uint32_t address = (uint32_t)handler;
 
-    idt[number].offset_lowerbits =
-            address & 0xFFFF;
+    idt[number].offset_lowerbits = address & 0xFFFF;
 
-    idt[number].offset_higherbits =
-            (address >> 16) & 0xFFFF;
+    idt[number].offset_higherbits = (address >> 16) & 0xFFFF;
 
     idt[number].selector = 0x08;
     idt[number].zero = 0;
@@ -132,8 +129,7 @@ void exception_handler(struct registers* regs)
     kprint("\n");
 
     /*If the exception happened while running
-    at privilege level 3, the CPU also supplied
-    user ESP and SS.*/
+    at privilege level 3, the CPU also supplied user ESP and SS.*/
     if ((regs->cs & 3) != 0) {
         kprint("User ESP:   ");
         kprint_hex(regs->useresp);
@@ -144,15 +140,11 @@ void exception_handler(struct registers* regs)
         kprint("\n");
     }
 
-    /*Page faults put the faulting linear address
-    into CR2.*/
+    //Page faults put the faulting linear address into CR2.
     if (regs->int_no == 14) {
         uint32_t fault_address;
 
-        __asm__ __volatile__(
-                "mov %%cr2, %0"
-                : "=r"(fault_address)
-                );
+        __asm__ __volatile__("mov %%cr2, %0" : "=r"(fault_address));
 
         kprint("\nPage fault address: ");
         kprint_hex(fault_address);
@@ -196,17 +188,14 @@ void setup_idt(void)
 {
     debug_put('I', 70);
 
-    uint32_t dummy_addr =
-            (uint32_t)dummy_isr;
+    uint32_t dummy_addr = (uint32_t)dummy_isr;
 
     /*Everything initially points at a harmless
     dummy interrupt handler.*/
     for (int i = 0; i < 256; i++) {
-        idt[i].offset_lowerbits =
-                dummy_addr & 0xFFFF;
+        idt[i].offset_lowerbits = dummy_addr & 0xFFFF;
 
-        idt[i].offset_higherbits =
-                (dummy_addr >> 16) & 0xFFFF;
+        idt[i].offset_higherbits = (dummy_addr >> 16) & 0xFFFF;
 
         idt[i].selector = 0x08;
         idt[i].zero = 0;
@@ -242,45 +231,38 @@ void setup_idt(void)
     Master IRQs: 0x20-0x27
     Slave IRQs:  0x28-0x2F*/
 
-    uint32_t master_irq_addr =
-            (uint32_t)default_master_irq;
+    uint32_t master_irq_addr = (uint32_t)default_master_irq;
 
-    uint32_t slave_irq_addr =
-            (uint32_t)default_slave_irq;
+    uint32_t slave_irq_addr = (uint32_t)default_slave_irq;
 
     for (int i = 0x22; i <= 0x27; i++) {
-        idt[i].offset_lowerbits =
-                master_irq_addr & 0xFFFF;
+        idt[i].offset_lowerbits = master_irq_addr & 0xFFFF;
 
-        idt[i].offset_higherbits =
-                (master_irq_addr >> 16) & 0xFFFF;
+        idt[i].offset_higherbits = (master_irq_addr >> 16) & 0xFFFF;
     }
 
     for (int i = 0x28; i <= 0x2F; i++) {
-        idt[i].offset_lowerbits =
-                slave_irq_addr & 0xFFFF;
+        idt[i].offset_lowerbits = slave_irq_addr & 0xFFFF;
 
-        idt[i].offset_higherbits =
-                (slave_irq_addr >> 16) & 0xFFFF;
+        idt[i].offset_higherbits = (slave_irq_addr >> 16) & 0xFFFF;
     }
 
     //Timer
-    set_gate(
-            0x20,
-            timer_isr_asm
-    );
+    set_gate(0x20,timer_isr_asm);
 
     //Keyboard.
-    set_gate(
-            0x21,
-            keyboard_isr_asm
-    );
+    set_gate(0x21,keyboard_isr_asm);
 
     //Mouse = IRQ12 = vector 0x2C.
-    set_gate(
-            0x2C,
-            mouse_isr_asm
-    );
+    set_gate(0x2C,mouse_isr_asm);
+
+    //syscall
+    uint32_t syscall_addr = (uint32_t)syscall_isr_asm;
+    idt[0x80].offset_lowerbits = syscall_addr & 0xFFFF;
+    idt[0x80].offset_higherbits = (syscall_addr >> 16) & 0xFFFF;
+    idt[0x80].selector = 0x08;
+    idt[0x80].zero = 0;
+    idt[0x80].type_attr = 0xEE;
 
     struct {
         uint16_t limit;
@@ -290,9 +272,7 @@ void setup_idt(void)
             (uint32_t)idt
     };
 
-    __asm__ __volatile__(
-            "lidt %0": : "m"(idtr)
-            );
+    __asm__ __volatile__("lidt %0": : "m"(idtr));
 
     debug_put('D', 71);
 }

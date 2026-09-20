@@ -67,11 +67,8 @@ void pmm_init(uint32_t mem_size, uint32_t bitmap_start_addr);
 void pmm_init_region(uint32_t base_addr, uint32_t size);
 void pmm_deinit_region(uint32_t base_addr, uint32_t size);
 
-int pmm_init_multiboot(
-        const multiboot_info_t* mbi,
-        uint32_t kernel_start,
-        uint32_t kernel_end
-);
+int pmm_init_multiboot(const multiboot_info_t* mbi, uint32_t kernel_start,
+                       uint32_t kernel_end);
 
 void* pmm_alloc_block(void);
 void pmm_free_block(void* p);

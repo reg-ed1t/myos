@@ -76,25 +76,18 @@ int map_page(void* phys_addr, void* virt_addr, uint32_t flags)
             return 0;
         }
 
-        pd[pd_idx] = ((uint32_t)new_pt_phys) |
-                     PAGE_PRESENT |
-                     PAGE_RW |
-                     flags;
+        pd[pd_idx] = ((uint32_t)new_pt_phys) | PAGE_PRESENT | PAGE_RW | flags;
 
-        invalidate_tlb_asm(
-                VMM_PAGE_TABLE_BASE + (pd_idx * 4096)
-        );
+        invalidate_tlb_asm(VMM_PAGE_TABLE_BASE + (pd_idx * 4096));
 
-        uint32_t* pt =
-                (uint32_t*)(VMM_PAGE_TABLE_BASE + (pd_idx * 4096));
+        uint32_t* pt = (uint32_t*)(VMM_PAGE_TABLE_BASE + (pd_idx * 4096));
 
         for (int i = 0; i < 1024; i++) {
             pt[i] = 0;
         }
     }
 
-    uint32_t* pt =
-            (uint32_t*)(VMM_PAGE_TABLE_BASE + (pd_idx * 4096));
+    uint32_t* pt = (uint32_t*)(VMM_PAGE_TABLE_BASE + pd_idx * 4096);
 
     pt[pt_idx] = (paddr & ~0xFFF) | PAGE_PRESENT | flags;
 
@@ -105,14 +98,11 @@ int map_page(void* phys_addr, void* virt_addr, uint32_t flags)
 
 int unmap_page(void* virt_addr)
 {
-    uint32_t vaddr =
-            (uint32_t)virt_addr;
+    uint32_t vaddr = (uint32_t)virt_addr;
 
-    uint32_t pd_idx =
-            PAGE_DIRECTORY_INDEX(vaddr);
+    uint32_t pd_idx = PAGE_DIRECTORY_INDEX(vaddr);
 
-    uint32_t pt_idx =
-            PAGE_TABLE_INDEX(vaddr);
+    uint32_t pt_idx = PAGE_TABLE_INDEX(vaddr);
 
     /*The recursive page-directory entry is special.
     Never allow it to be unmapped through this function.*/
@@ -128,10 +118,7 @@ int unmap_page(void* virt_addr)
         return 0;
     }
 
-    uint32_t* pt =
-            (uint32_t*)
-                    (VMM_PAGE_TABLE_BASE +
-                     (pd_idx * 4096));
+    uint32_t* pt = (uint32_t*)(VMM_PAGE_TABLE_BASE + pd_idx * 4096);
 
     //The page is already unmapped.
     if (!(pt[pt_idx] & PAGE_PRESENT)) {
@@ -163,11 +150,8 @@ int unmap_page(void* virt_addr)
     pd[pd_idx] = 0;
 
     /*The recursive page-table virtual address now
-     * refers to an unmapped page, so invalidate it too.*/
-    invalidate_tlb_asm(
-            VMM_PAGE_TABLE_BASE +
-            (pd_idx * 4096)
-    );
+    refers to an unmapped page, so invalidate it too.*/
+    invalidate_tlb_asm(VMM_PAGE_TABLE_BASE + (pd_idx * 4096));
 
     //Return the now-unused page table to the PMM
     pmm_free_block((void*)pt_phys);

@@ -133,8 +133,7 @@ static uint32_t multiboot_get_max_memory(const multiboot_info_t* mbi)
 
     while (current < end) {
 
-        multiboot_mmap_entry_t* entry =
-                (multiboot_mmap_entry_t*)current;
+        multiboot_mmap_entry_t* entry = (multiboot_mmap_entry_t*)current;
 
         if (entry->addr_high == 0 && entry->len_high == 0) {
 
@@ -147,12 +146,10 @@ static uint32_t multiboot_get_max_memory(const multiboot_info_t* mbi)
 
             } else {
 
-                region_end =
-                        entry->addr_low + entry->len_low;
+                region_end = entry->addr_low + entry->len_low;
             }
 
-            if (entry->type == MULTIBOOT_MEMORY_AVAILABLE &&
-                region_end > max_addr) {
+            if (entry->type == MULTIBOOT_MEMORY_AVAILABLE && region_end > max_addr) {
 
                 max_addr = region_end;
             }
