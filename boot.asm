@@ -35,65 +35,92 @@ global keyboard_isr_asm
 extern keyboard_handler
 
 keyboard_isr_asm:
+    cld
+    push ds
+    push es
+    push fs
+    push gs
     pusha
+
     mov ax, 0x10
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
+
     call keyboard_handler
-    mov ax, 0x23
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
+
     popa
-    iret
+    pop gs
+    pop fs
+    pop es
+    pop ds
+    iretd
 
 ; Timer
 global timer_isr_asm
 extern timer_handler
 
 timer_isr_asm:
+    cld
+    push ds
+    push es
+    push fs
+    push gs
     pusha
+
     mov ax, 0x10
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
+
     call timer_handler
-    mov ax, 0x23
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
+
     popa
-    iret
+    pop gs
+    pop fs
+    pop es
+    pop ds
+    iretd
 
 ; Mouse
 global mouse_isr_asm
 extern mouse_handler
+
 mouse_isr_asm:
+    cld
+    push ds
+    push es
+    push fs
+    push gs
     pusha
+
     mov ax, 0x10
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
+
     call mouse_handler
-    mov ax, 0x23
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
+
     popa
-    iret
+    pop gs
+    pop fs
+    pop es
+    pop ds
+    iretd
 
 ; System calls
 global syscall_isr_asm
 extern syscall_handler
 
 syscall_isr_asm:
+    cld
+    push ds
+    push es
+    push fs
+    push gs
     pusha
 
     mov ax, 0x10
@@ -108,13 +135,11 @@ syscall_isr_asm:
 
     mov [esp + 28], eax
 
-    mov ax, 0x23
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
-
     popa
+    pop gs
+    pop fs
+    pop es
+    pop ds
     iretd
 
 ; GDT
@@ -145,8 +170,6 @@ tss_flush:
     ret
 
 ; Enter user mode
-; void enter_user_mode(uint32_t entry, uint32_t user_esp);
-; void enter_user_mode(uint32_t entry, uint32_t user_esp);
 global enter_user_mode
 enter_user_mode:
     cli

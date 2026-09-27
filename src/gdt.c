@@ -1,4 +1,5 @@
 #include "gdt.h"
+#include "io.h"
 
 #define GDT_ENTRIES 6
 
@@ -41,6 +42,7 @@ static void write_tss(int num, uint16_t ss0, uint32_t esp0)
 
 void setup_gdt(void)
 {
+    print_serial("going to gdt setup\n");
     gdt_p.limit = (sizeof(struct GDT_entry) * GDT_ENTRIES) - 1;
     gdt_p.base = (uint32_t)&gdt;
 
@@ -56,6 +58,8 @@ void setup_gdt(void)
 
     gdt_flush((uint32_t)&gdt_p);
     tss_flush();
+    print_serial("gdt done\n");
+
 }
 
 void set_kernel_stack(uint32_t stack)

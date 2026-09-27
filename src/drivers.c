@@ -2,17 +2,17 @@
 #include "io.h"
 #include "vga.h"
 
-volatile char command_buffer[64];
 volatile int command_len = 0;
+volatile char command_buffer[256];
 volatile uint8_t command_ready = 0;
 volatile uint32_t timer_ticks = 0;
 const char scancode_to_ascii[] = {
-    0,  27, '1', '2', '3', '4', '5', '6', '7', '8',	/* 0x00 - 0x09 */
-  '9', '0', '-', '=', '\b', '\t', 'q', 'w', 'e', 'r',	/* 0x0A - 0x13 */
-  't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n',    0,	/* 0x14 - 0x1D */
-  'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';',	/* 0x1E - 0x27 */
- '\'', '`',   0, '\\', 'z', 'x', 'c', 'v', 'b', 'n',	/* 0x28 - 0x31 */
-  'm', ',', '.', '/',   0, '*',   0, ' ',   0,   0	/* 0x32 - 0x3B */
+    0,  27, '1', '2', '3', '4', '5', '6', '7', '8',	// 0x00 - 0x09
+  '9', '0', '-', '=', '\b', '\t', 'q', 'w', 'e', 'r',	// 0x0A - 0x13
+  't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n',    0,	// 0x14 - 0x1D
+  'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';',	// 0x1E - 0x27
+ '\'', '`',   0, '\\', 'z', 'x', 'c', 'v', 'b', 'n',	// 0x28 - 0x31
+  'm', ',', '.', '/',   0, '*',   0, ' ',   0,   0	// 0x32 - 0x3B
 };
 
 void init_timer(uint32_t frequency) {
@@ -51,8 +51,6 @@ void sleep(uint32_t ticks) {
 }
 
 void keyboard_handler(void) {
-    debug_put('H', 74);
-
     uint8_t scancode = inb(0x60);
 
     if (scancode & 0x80) {
@@ -81,7 +79,7 @@ void keyboard_handler(void) {
             }
 		} else if (ascii != 0) {
             //store commands
-            if (command_len < 63) {
+            if (command_len < 255) {
                 command_buffer[command_len++] = ascii;
                 
                 if (sym >= 4000) {
@@ -136,8 +134,11 @@ void read_rtc(void) {
     }
 
     //convert to 24h format
-    if (!(register_b & 0x02) && (rtc_hour & 0x80)) {
-        rtc_hour = ((rtc_hour & 0x7F) + 12) % 24;
+    if (!(register_b & 0x02)) {                 // 12-hour mode
+        uint8_t pm  = rtc_hour & 0x80;
+        uint8_t h12 = rtc_hour & 0x7F;           // 1-12
+        if (h12 == 12) h12 = 0;                  // 12 -> 0 base
+        rtc_hour = h12 + (pm ? 12 : 0);
     }
 
     rtc_year = year_short + 2000;
@@ -255,9 +256,12 @@ void mouse_handler(void) {
         mouse_x += offset_x;
         mouse_y -= offset_y;
 
-        if (mouse_buttons & 1) debug_put('L', 70); // Left Clicked
-        if (mouse_buttons & 2) debug_put('R', 71); // Right Clicked
-		if (mouse_buttons & 4) debug_put('M', 72); // middle click
+        //if (mouse_buttons & 1) debug_put('L', 70); // Left Clicked
+        if (mouse_buttons & 1) print_serial("left mouse button clicked\n");
+        //if (mouse_buttons & 2) debug_put('R', 71); // Right Clicked
+        if (mouse_buttons & 2) print_serial("right mouse button clicked\n");
+        //if (mouse_buttons & 4) debug_put('M', 72); // middle click
+        if (mouse_buttons & 4) print_serial("middle mouse button clicked\n");
     }
 
     outb(0x20, 0x20);

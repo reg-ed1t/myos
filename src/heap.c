@@ -67,19 +67,63 @@ static void merge_with_next(heap_block_t* block)
     }
 }
 
+static void heap_rollback(uint32_t start, uint32_t page_count)
+{
+    for (uint32_t i = page_count; i > 0; i--) {
+        uint32_t virtual_address =
+                start + (i - 1) * HEAP_PAGE_SIZE;
+
+        uint32_t pd_idx =
+                PAGE_DIRECTORY_INDEX(virtual_address);
+
+        uint32_t pt_idx =
+                PAGE_TABLE_INDEX(virtual_address);
+
+        uint32_t* pd =
+                (uint32_t*)VMM_PAGE_DIR_BASE;
+
+        if (!(pd[pd_idx] & PAGE_PRESENT)) {
+            continue;
+        }
+
+        uint32_t* pt =
+                (uint32_t*)(VMM_PAGE_TABLE_BASE + pd_idx * 4096);
+
+        uint32_t entry = pt[pt_idx];
+
+        if (!(entry & PAGE_PRESENT)) {
+            continue;
+        }
+
+        void* physical =
+                (void*)(entry & ~0xFFFU);
+
+        if (unmap_page((void*)virtual_address)) {
+            pmm_free_block(physical);
+        }
+    }
+}
+
 static int heap_grow(uint32_t minimum_size)
 {
+    if (minimum_size > 0xFFFFFFFFU - sizeof(heap_block_t)) {
+        return 0;
+    }
+
     uint32_t required =
             align_up(
                     minimum_size + sizeof(heap_block_t),
                     HEAP_PAGE_SIZE
             );
 
-    if (heap_current_end + required > KERNEL_HEAP_END) {
+    if (required < minimum_size ||
+        heap_current_end > KERNEL_HEAP_END ||
+        required > KERNEL_HEAP_END - heap_current_end) {
         return 0;
     }
 
     uint32_t start = heap_current_end;
+    uint32_t mapped_pages = 0;
 
     for (uint32_t offset = 0;
          offset < required;
@@ -88,6 +132,7 @@ static int heap_grow(uint32_t minimum_size)
         void* physical = pmm_alloc_block();
 
         if (!physical) {
+            heap_rollback(start, mapped_pages);
             return 0;
         }
 
@@ -97,8 +142,11 @@ static int heap_grow(uint32_t minimum_size)
                 PAGE_PRESENT | PAGE_RW
         )) {
             pmm_free_block(physical);
+            heap_rollback(start, mapped_pages);
             return 0;
         }
+
+        mapped_pages++;
     }
 
     heap_block_t* block =
@@ -199,17 +247,24 @@ void kfree(void* ptr)
         return;
     }
 
-    uint32_t address = (uint32_t)ptr;
+    heap_block_t* block = heap_head;
 
-    if (address < KERNEL_HEAP_START ||
-        address >= KERNEL_HEAP_END) {
+    while (block) {
+        void* block_ptr =
+                (void*)((uint32_t)block +
+                        sizeof(heap_block_t));
+
+        if (ptr == block_ptr) {
+            break;
+        }
+
+        block = block->next;
+    }
+
+    if (!block) {
         kprint("HEAP: invalid pointer\n");
         return;
     }
-
-    heap_block_t* block =
-            (heap_block_t*)(address -
-                            sizeof(heap_block_t));
 
     if (block->free) {
         kprint("HEAP: double free detected\n");

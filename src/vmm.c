@@ -41,7 +41,7 @@ int init_vmm(void) {
 			uint32_t* pt_ptr = (uint32_t*)new_pt_phys;
             for(int k = 0; k < 1024; k++) pt_ptr[k] = 0;
 
-            pd[pd_idx] = ((uint32_t)new_pt_phys) | PAGE_PRESENT | PAGE_RW;
+            pd[pd_idx] = ((uint32_t)new_pt_phys) | PAGE_PRESENT | PAGE_RW | PAGE_USER;
         }
 
         uint32_t* pt = (uint32_t*)(pd[pd_idx] & ~0xFFF);
@@ -63,8 +63,18 @@ int map_page(void* phys_addr, void* virt_addr, uint32_t flags)
     uint32_t vaddr = (uint32_t)virt_addr;
     uint32_t paddr = (uint32_t)phys_addr;
 
+    if ((vaddr & 0xFFFU) != 0 || (paddr & 0xFFFU) != 0) {
+        kprint("VMM: unaligned page mapping\n");
+        return 0;
+    }
+
     uint32_t pd_idx = PAGE_DIRECTORY_INDEX(vaddr);
     uint32_t pt_idx = PAGE_TABLE_INDEX(vaddr);
+
+    if (pd_idx == RECURSIVE_PD_INDEX) {
+        kprint("VMM: cannot map recursive paging region\n");
+        return 0;
+    }
 
     uint32_t* pd = (uint32_t*)VMM_PAGE_DIR_BASE;
 
@@ -76,20 +86,31 @@ int map_page(void* phys_addr, void* virt_addr, uint32_t flags)
             return 0;
         }
 
-        pd[pd_idx] = ((uint32_t)new_pt_phys) | PAGE_PRESENT | PAGE_RW | flags;
-
-        invalidate_tlb_asm(VMM_PAGE_TABLE_BASE + (pd_idx * 4096));
-
-        uint32_t* pt = (uint32_t*)(VMM_PAGE_TABLE_BASE + (pd_idx * 4096));
+        uint32_t* pt = (uint32_t*)new_pt_phys;
 
         for (int i = 0; i < 1024; i++) {
             pt[i] = 0;
         }
+
+        pd[pd_idx] =
+                ((uint32_t)new_pt_phys) |
+                PAGE_PRESENT |
+                PAGE_RW |
+                (flags & PAGE_USER);
+    } else {
+        pd[pd_idx] |= flags & (PAGE_RW | PAGE_USER);
     }
 
-    uint32_t* pt = (uint32_t*)(VMM_PAGE_TABLE_BASE + pd_idx * 4096);
+    uint32_t* pt =
+            (uint32_t*)(VMM_PAGE_TABLE_BASE + pd_idx * 4096);
 
-    pt[pt_idx] = (paddr & ~0xFFF) | PAGE_PRESENT | flags;
+    pt[pt_idx] =
+            paddr |
+            PAGE_PRESENT |
+            (flags & (PAGE_RW |
+                      PAGE_USER |
+                      PAGE_WRITE_THROUGH |
+                      PAGE_CACHE_DISABLE));
 
     invalidate_tlb_asm(vaddr);
 

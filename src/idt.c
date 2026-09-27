@@ -1,8 +1,6 @@
 #include "idt.h"
 #include "vga.h"
 #include "io.h"
-#include "syscall.h"
-#include "drivers.h"
 
 struct IDT_entry idt[256];
 
@@ -186,65 +184,31 @@ void exception_handler(struct registers* regs)
 
 void setup_idt(void)
 {
-    debug_put('I', 70);
+    print_serial("going to idt setup\n");
 
-    uint32_t dummy_addr = (uint32_t)dummy_isr;
-
-    /*Everything initially points at a harmless
-    dummy interrupt handler.*/
     for (int i = 0; i < 256; i++) {
-        idt[i].offset_lowerbits = dummy_addr & 0xFFFF;
-
-        idt[i].offset_higherbits = (dummy_addr >> 16) & 0xFFFF;
-
-        idt[i].selector = 0x08;
-        idt[i].zero = 0;
-        idt[i].type_attr = 0x8E;
+        set_gate(i, dummy_isr);
     }
 
-    //CPU exceptions 0-19.
-    set_gate(0, exception_0);
-    set_gate(1, exception_1);
-    set_gate(2, exception_2);
-    set_gate(3, exception_3);
-    set_gate(4, exception_4);
-    set_gate(5, exception_5);
-    set_gate(6, exception_6);
-    set_gate(7, exception_7);
-    set_gate(8, exception_8);
-    set_gate(9, exception_9);
-    set_gate(10, exception_10);
-    set_gate(11, exception_11);
-    set_gate(12, exception_12);
-    set_gate(13, exception_13);
-    set_gate(14, exception_14);
-    set_gate(15, exception_15);
-    set_gate(16, exception_16);
-    set_gate(17, exception_17);
-    set_gate(18, exception_18);
-    set_gate(19, exception_19);
+    void (*exceptions[])(void) = {
+        exception_0,  exception_1,  exception_2,  exception_3,  exception_4,
+        exception_5,  exception_6,  exception_7,  exception_8,  exception_9,
+        exception_10, exception_11, exception_12, exception_13, exception_14,
+        exception_15, exception_16, exception_17, exception_18, exception_19
+    };
 
-    //Exception 30
+    for (int i = 0; i < 20; i++) {
+        set_gate(i, exceptions[i]);
+    }
+
     set_gate(30, exception_30);
 
-    /*PIC IRQs.
-    Master IRQs: 0x20-0x27
-    Slave IRQs:  0x28-0x2F*/
-
-    uint32_t master_irq_addr = (uint32_t)default_master_irq;
-
-    uint32_t slave_irq_addr = (uint32_t)default_slave_irq;
-
-    for (int i = 0x22; i <= 0x27; i++) {
-        idt[i].offset_lowerbits = master_irq_addr & 0xFFFF;
-
-        idt[i].offset_higherbits = (master_irq_addr >> 16) & 0xFFFF;
+    for (int i = 0x20; i <= 0x27; i++) {
+        set_gate(i, default_master_irq);
     }
 
     for (int i = 0x28; i <= 0x2F; i++) {
-        idt[i].offset_lowerbits = slave_irq_addr & 0xFFFF;
-
-        idt[i].offset_higherbits = (slave_irq_addr >> 16) & 0xFFFF;
+        set_gate(i, default_slave_irq);
     }
 
     //Timer
@@ -256,23 +220,17 @@ void setup_idt(void)
     //Mouse = IRQ12 = vector 0x2C.
     set_gate(0x2C,mouse_isr_asm);
 
-    //syscall
-    uint32_t syscall_addr = (uint32_t)syscall_isr_asm;
-    idt[0x80].offset_lowerbits = syscall_addr & 0xFFFF;
-    idt[0x80].offset_higherbits = (syscall_addr >> 16) & 0xFFFF;
-    idt[0x80].selector = 0x08;
-    idt[0x80].zero = 0;
+    set_gate(0x80, syscall_isr_asm);
     idt[0x80].type_attr = 0xEE;
 
     struct {
         uint16_t limit;
         uint32_t base;
     } __attribute__((packed)) idtr = {
-            sizeof(idt) - 1,
-            (uint32_t)idt
+        sizeof(idt) - 1,
+        (uint32_t)idt
     };
 
     __asm__ __volatile__("lidt %0": : "m"(idtr));
-
-    debug_put('D', 71);
+    print_serial("idt done\n");
 }

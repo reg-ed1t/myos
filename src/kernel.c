@@ -91,7 +91,8 @@ static void process_command(const volatile char* buffer)
 
     if (command_is(buffer, "help")) {
 
-        debug_put('C', 75);
+        //debug_put('C', 75);
+        print_serial("processing commands ready\n");
 
         kprint("help - list all commands.\n");
         kprint("clear - clear the screen.\n");
@@ -108,7 +109,7 @@ static void process_command(const volatile char* buffer)
         kprint("  crash -bounds\n");
         kprint("mem - show physical memory usage\n");
         kprint("reboot - reboot the system\n");
-        kprint("ring3 - enter user mode\n");
+        kprint("ring3 - enter user mode");
 
     } else if (command_is(buffer, "clear")) {
 
@@ -200,11 +201,11 @@ static void process_command(const volatile char* buffer)
         kprint_int(free);
         kprint(" blocks (");
         kprint_int(free * 4);
-        kprint(" KB)\n");
+        kprint(" KB)");
 
     } else if (command_is(buffer, "reboot")) {
 
-        kprint("Rebooting...\n");
+        kprint("Rebooting...");
 
         // Wait until keyboard controller input buffer is empty
         while (inb(0x64) & 0x02)
@@ -221,12 +222,12 @@ static void process_command(const volatile char* buffer)
         enter_ring3();
     } else {
 
-        kprint("unknown command\n");
+        kprint("unknown command");
     }
 }
 
-int old_grid_x = 0;
-int old_grid_y = 0;
+static int old_grid_x = 0;
+static int old_grid_y = 0;
 
 static void update_mouse_pointer(void) {
     int current_grid_x = mouse_x / 16;
@@ -249,19 +250,14 @@ static void update_mouse_pointer(void) {
     old_grid_y = current_grid_y;
 }
 
-void kernel_main(
-        uint32_t multiboot_magic,
-        uint32_t multiboot_info_addr
-)
+void kernel_main(uint32_t multiboot_magic, uint32_t multiboot_info_addr)
 {
     clear();
 
-    debug_put('M', 69);
+    print_serial("starting system\n");
 
     setup_gdt();
     setup_idt();
-
-    debug_put('P', 72);
 
     /*Remap the PIC
     Master IRQs -> vectors 0x20-0x27
@@ -279,9 +275,7 @@ void kernel_main(
     outb(0xA1, 0x01);
 
 
-    /*
-     * Verify that GRUB actually gave us Multiboot data.
-     */
+    //Verify that GRUB actually gave us Multiboot data
     if (multiboot_magic != MULTIBOOT_BOOTLOADER_MAGIC) {
 
         kprint("FATAL: invalid Multiboot magic.");
@@ -307,13 +301,9 @@ void kernel_main(
     }
 
     //Initialize PMM from the actual Multiboot memory map
-    multiboot_info_t* mbi =
-            (multiboot_info_t*)multiboot_info_addr;
+    multiboot_info_t* mbi = (multiboot_info_t*)multiboot_info_addr;
 
-    if (!pmm_init_multiboot(
-            mbi,
-            (uint32_t)&__kernel_start,
-            (uint32_t)&__kernel_end)) {
+    if (!pmm_init_multiboot(mbi,(uint32_t)&__kernel_start,(uint32_t)&__kernel_end)) {
 
         kprint("FATAL: PMM initialization failed.");
         new_line();
@@ -391,9 +381,7 @@ void kernel_main(
     void* heap_test_b = kmalloc(128);
     void* heap_test_c = kmalloc(4096);
 
-    if (!heap_test_a ||
-        !heap_test_b ||
-        !heap_test_c) {
+    if (!heap_test_a || !heap_test_b || !heap_test_c) {
 
         kprint("FATAL: kernel heap allocation failed.");
         new_line();
@@ -498,7 +486,8 @@ void kernel_main(
     sym = ((sym / 160) + 1) * 160;
     update_cursor(sym / 2);
 
-    debug_put('s', 73); // debug STI
+    //debug_put('s', 73); // debug STI
+    print_serial("going into main loop\n");
     sti();
 
     // Infinite kernel execution loop

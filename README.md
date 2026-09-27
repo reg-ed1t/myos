@@ -15,7 +15,9 @@ Don't expect anything particularly useful yet.
 - Interrupt handling
 - Physical memory management
 - Virtual memory management
-- A few other things that may or may not be finished
+- Pages
+- Basic commands support
+- Basic usermode
 
 ## Building
 
@@ -24,3 +26,11 @@ Don't expect anything particularly useful yet.
 Or, if you want to be a little stricter and get much more errors and warnings:
 
 `make strict`
+
+### Other makefile arguments
+
+| Argument | Description |
+| :--- | :--- |
+| `TOOLCHAIN=clang` | Compile project using Clang toolchain |
+| `TOOLCHAIN=gcc` | Compile project using GCC (`i386-elf-gcc`) |
+| `CROSS_PREFIX=i386-elf-` | Set target architecture prefix for GCC |

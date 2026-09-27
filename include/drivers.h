@@ -4,15 +4,15 @@
 #include <stdint.h>
 
 #define CMOS_ADDRESS_PORT 0x70
-#define CMOS_DATA_PORT    0x71
+#define CMOS_DATA_PORT 0x71
 #define PIT_COMMAND_PORT 0x43
 #define PIT_CHANNEL2_PORT 0x42
-#define SPEAKER_PORT     0x61
-#define PS2_STATUS_PORT  0x64
+#define SPEAKER_PORT 0x61
+#define PS2_STATUS_PORT 0x64
 #define PS2_COMMAND_PORT 0x64
-#define PS2_DATA_PORT    0x60
+#define PS2_DATA_PORT 0x60
 
-extern volatile char command_buffer[64];
+extern volatile char command_buffer[256];
 extern volatile int command_len;
 extern volatile uint8_t command_ready;
 extern volatile uint32_t timer_ticks;

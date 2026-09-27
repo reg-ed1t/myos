@@ -2,6 +2,7 @@
 #include "pmm.h"
 #include "vmm.h"
 #include "gdt.h"
+#include "io.h"
 #include "vga.h"
 
 extern void enter_user_mode(uint32_t entry, uint32_t user_esp);
@@ -9,12 +10,20 @@ extern uint32_t stack_top;
 
 void enter_ring3(void)
 {
+    print_serial("going to enter ring3\n");
     kprint("RING3 START\n");
 
-    void *code_phys = pmm_alloc_block();
-    void *stack_phys = pmm_alloc_block();
+    void* code_phys = pmm_alloc_block();
 
-    if (!code_phys || !stack_phys) {
+    if (!code_phys) {
+        kprint("alloc fail\n");
+        return;
+    }
+
+    void* stack_phys = pmm_alloc_block();
+
+    if (!stack_phys) {
+        pmm_free_block(code_phys);
         kprint("alloc fail\n");
         return;
     }
@@ -22,8 +31,25 @@ void enter_ring3(void)
     uint32_t code_va = 0x40000000;
     uint32_t stack_va = 0x40001000;
 
-    if (!map_page(code_phys, (void*)code_va, PAGE_PRESENT | PAGE_RW | PAGE_USER) ||
-        !map_page(stack_phys, (void*)stack_va, PAGE_PRESENT | PAGE_RW | PAGE_USER)) {
+    if (!map_page(
+            code_phys,
+            (void*)code_va,
+            PAGE_PRESENT | PAGE_RW | PAGE_USER
+    )) {
+        pmm_free_block(code_phys);
+        pmm_free_block(stack_phys);
+        kprint("map fail\n");
+        return;
+    }
+
+    if (!map_page(
+            stack_phys,
+            (void*)stack_va,
+            PAGE_PRESENT | PAGE_RW | PAGE_USER
+    )) {
+        unmap_page((void*)code_va);
+        pmm_free_block(code_phys);
+        pmm_free_block(stack_phys);
         kprint("map fail\n");
         return;
     }
