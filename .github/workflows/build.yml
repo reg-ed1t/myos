@@ -39,17 +39,18 @@ jobs:
       - name: Build with GCC
         run: |
           export PATH="$HOME/opt/cross/bin:$PATH"
-          make all TOOLCHAIN=gcc
+          make debug TOOLCHAIN=gcc
+          make release TOOLCHAIN=gcc
 
       - name: Build with Clang
         run: |
-          make clean
-          make all TOOLCHAIN=clang
+          make debug TOOLCHAIN=clang
+          make release TOOLCHAIN=clang
 
       - name: Upload ISO
         uses: actions/upload-artifact@v4
         with:
           name: myos
           path: |
-            build/myos.iso
-            build/myos.bin
+            build/release/myos.iso
+            build/release/myos.bin
