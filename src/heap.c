@@ -2,6 +2,7 @@
 #include "pmm.h"
 #include "vmm.h"
 #include "vga.h"
+#include "io.h"
 
 #define HEAP_PAGE_SIZE 4096
 
@@ -193,15 +194,14 @@ void heap_init(void)
         return;
     }
 
-    kprint("Kernel heap online\n");
+    print_serial("Kernel heap works\n");
 }
 
 void* kmalloc(uint32_t size)
 {
-    if (size == 0) {
+    if (size == 0 || size > KERNEL_HEAP_END - KERNEL_HEAP_START) {
         return 0;
     }
-
     size = align_up(size, 8);
 
     heap_block_t* block = heap_head;

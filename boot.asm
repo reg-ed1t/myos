@@ -117,29 +117,28 @@ extern syscall_handler
 
 syscall_isr_asm:
     cld
+    push dword 0            ; err_code
+    push dword 0x80         ; int_no
+    pusha
     push ds
     push es
     push fs
     push gs
-    pusha
-
     mov ax, 0x10
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
-
     push esp
     call syscall_handler
     add esp, 4
-
-    mov [esp + 28], eax
-
-    popa
+    mov [esp + 44], eax     ; saved EAX = 16 (segments) + 28 (inside pusha block)
     pop gs
     pop fs
     pop es
     pop ds
+    popa
+    add esp, 8
     iretd
 
 ; GDT
@@ -211,6 +210,10 @@ global exception_16
 global exception_17
 global exception_18
 global exception_19
+global exception_20
+global exception_21
+global exception_28
+global exception_29
 global exception_30
 
 extern exception_handler
@@ -320,6 +323,39 @@ exception_19:
 
 ; Exception 30: Security Exception
 ; CPU provides an error code.
+; Exception 20: Virtualization Exception
+exception_20:
+    push 0
+    push 20
+    jmp exception_common
+
+; Exception 21: Control Protection Exception
+; CPU provides an error code
+exception_21:
+    push 21
+    jmp exception_common
+
+; Exception 22: Reserved
+; Exception 23: Reserved
+; Exception 24: Reserved
+; Exception 25: Reserved
+; Exception 26: Reserved
+; Exception 27: Reserved
+
+; Exception 28: Hypervisor Injection Exception
+exception_28:
+    push 0
+    push 28
+    jmp exception_common
+
+; Exception 29: VMM Communication Exception
+; CPU provides an error code
+exception_29:
+    push 29
+    jmp exception_common
+
+; Exception 30: Security Exception
+; CPU provides an error code
 exception_30:
     push 30
     jmp exception_common
@@ -342,15 +378,26 @@ exception_30:
 ;   esp + 56  = user SS
 
 exception_common:
+    cld
     pusha
-
+    push ds
+    push es
+    push fs
+    push gs
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
     push esp
     call exception_handler
     add esp, 4
-
+    pop gs
+    pop fs
+    pop es
+    pop ds
     popa
     add esp, 8
-
     iret
 
 ; Page-directory / paging support

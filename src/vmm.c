@@ -86,11 +86,11 @@ int map_page(void* phys_addr, void* virt_addr, uint32_t flags)
             return 0;
         }
 
-        uint32_t* pt = (uint32_t*)new_pt_phys;
+        pd[pd_idx] = ((uint32_t)new_pt_phys) | PAGE_PRESENT | PAGE_RW | (flags & PAGE_USER);
+        invalidate_tlb_asm(VMM_PAGE_TABLE_BASE + (pd_idx * 4096));
 
-        for (int i = 0; i < 1024; i++) {
-            pt[i] = 0;
-        }
+        uint32_t* new_pt = (uint32_t*)(VMM_PAGE_TABLE_BASE + (pd_idx * 4096));
+        for (int i = 0; i < 1024; i++) new_pt[i] = 0;
 
         pd[pd_idx] =
                 ((uint32_t)new_pt_phys) |

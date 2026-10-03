@@ -91,7 +91,6 @@ static void process_command(const volatile char* buffer)
 
     if (command_is(buffer, "help")) {
 
-        //debug_put('C', 75);
         print_serial("processing commands ready\n");
 
         kprint("help - list all commands.\n");
@@ -125,7 +124,7 @@ static void process_command(const volatile char* buffer)
 
         if (*argument == '\0') {
 
-            kprint("Crash tests need an argument.\n");
+            kprint("Crash tests need an argument.");
 
         } else if (kstrcmp(argument, "-zerodivide") == 0) {
 
@@ -153,7 +152,7 @@ static void process_command(const volatile char* buffer)
 
         } else {
 
-            kprint("unknown crash test\n");
+            kprint("unknown crash test");
         }
 
     } else if (command_is(buffer, "time")) {
@@ -207,16 +206,7 @@ static void process_command(const volatile char* buffer)
 
         kprint("Rebooting...");
 
-        // Wait until keyboard controller input buffer is empty
-        while (inb(0x64) & 0x02)
-            ;
-
-        outb(0x64, 0xFE);   // pulse reset line
-
-        // Fallback: triple fault
-        uint16_t empty_idt[3] = {0, 0, 0};
-        __asm__ __volatile__("lidt %0" : : "m"(empty_idt));
-        __asm__ __volatile__("int $0");
+        reboot();
 
     } else if (command_is(buffer, "ring3")) {
         enter_ring3();
@@ -253,6 +243,7 @@ static void update_mouse_pointer(void) {
 void kernel_main(uint32_t multiboot_magic, uint32_t multiboot_info_addr)
 {
     clear();
+    init_serial();
 
     print_serial("starting system\n");
 
@@ -315,11 +306,9 @@ void kernel_main(uint32_t multiboot_magic, uint32_t multiboot_info_addr)
         }
     }
 
-    kprint("Physical Memory Manager online.");
-    new_line();
+    print_serial("Physical Memory Manager works.\n");
 
-
-    //Basic PMM allocation test.
+    //Basic PMM allocation test
     void* block1 = pmm_alloc_block();
 
     if (!block1) {
@@ -372,8 +361,7 @@ void kernel_main(uint32_t multiboot_magic, uint32_t multiboot_info_addr)
         }
     }
 
-    kprint("VMM (Paging) fully online.");
-    new_line();
+    print_serial("VMM (Paging) works.\n");
 
     heap_init();
 
@@ -393,8 +381,7 @@ void kernel_main(uint32_t multiboot_magic, uint32_t multiboot_info_addr)
         }
     }
 
-    kprint("Kernel heap allocation test passed.");
-    new_line();
+    print_serial("Kernel heap allocation test passed.\n");
 
     kfree(heap_test_b);
 
@@ -453,8 +440,7 @@ void kernel_main(uint32_t multiboot_magic, uint32_t multiboot_info_addr)
     *test_ptr = 0xDEADBEEF;
 
     if (*test_ptr == 0xDEADBEEF) {
-        kprint("Virtual Memory Test Passed! Mapped 0xC0000000 successfully.");
-        new_line();
+        kprint("Virtual Memory Test Passed! Mapped 0xC0000000 successfully.\n");
     }
 
     if (!unmap_page((void*)0xC0000000)) {
@@ -471,8 +457,7 @@ void kernel_main(uint32_t multiboot_magic, uint32_t multiboot_info_addr)
 
     pmm_free_block(phys_frame);
 
-    kprint("Virtual Memory Test Passed! Unmapped 0xC0000000 successfully.");
-    new_line();
+    print_serial("Virtual Memory Test Passed! Unmapped 0xC0000000 successfully.\n");
 
     init_timer(100);
 
@@ -483,10 +468,8 @@ void kernel_main(uint32_t multiboot_magic, uint32_t multiboot_info_addr)
 
     kprint("system up.");
 
-    sym = ((sym / 160) + 1) * 160;
-    update_cursor(sym / 2);
+    new_line();
 
-    //debug_put('s', 73); // debug STI
     print_serial("going into main loop\n");
     sti();
 

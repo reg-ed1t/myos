@@ -37,6 +37,10 @@ extern void exception_16(void);
 extern void exception_17(void);
 extern void exception_18(void);
 extern void exception_19(void);
+extern void exception_20(void);
+extern void exception_21(void);
+extern void exception_28(void);
+extern void exception_29(void);
 extern void exception_30(void);
 
 
@@ -126,8 +130,7 @@ void exception_handler(struct registers* regs)
     kprint_hex(regs->eflags);
     kprint("\n");
 
-    /*If the exception happened while running
-    at privilege level 3, the CPU also supplied user ESP and SS.*/
+    //If the exception happened while running at privilege level 3, the CPU also supplied user ESP and SS
     if ((regs->cs & 3) != 0) {
         kprint("User ESP:   ");
         kprint_hex(regs->useresp);
@@ -190,17 +193,22 @@ void setup_idt(void)
         set_gate(i, dummy_isr);
     }
 
-    void (*exceptions[])(void) = {
+    static void (* const exceptions[])(void) = {
         exception_0,  exception_1,  exception_2,  exception_3,  exception_4,
         exception_5,  exception_6,  exception_7,  exception_8,  exception_9,
         exception_10, exception_11, exception_12, exception_13, exception_14,
         exception_15, exception_16, exception_17, exception_18, exception_19
     };
 
-    for (int i = 0; i < 20; i++) {
+    for (uint32_t i = 0; i < sizeof(exceptions) / sizeof(exceptions[0]); i++) {
         set_gate(i, exceptions[i]);
     }
-
+    
+    set_gate(20, exception_20);
+    set_gate(21, exception_21);
+    set_gate(28, exception_28);
+    set_gate(29, exception_29);
+    set_gate(30, exception_30);
     set_gate(30, exception_30);
 
     for (int i = 0x20; i <= 0x27; i++) {

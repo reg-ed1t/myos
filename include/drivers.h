@@ -1,5 +1,5 @@
-#ifndef drivers_h
-#define drivers_h
+#ifndef DRIVERS_H
+#define DRIVERS_H
 
 #include <stdint.h>
 
@@ -11,8 +11,9 @@
 #define PS2_STATUS_PORT 0x64
 #define PS2_COMMAND_PORT 0x64
 #define PS2_DATA_PORT 0x60
+#define COMMAND_BUFFER_SIZE 256
 
-extern volatile char command_buffer[256];
+extern volatile char command_buffer[COMMAND_BUFFER_SIZE];
 extern volatile int command_len;
 extern volatile uint8_t command_ready;
 extern volatile uint32_t timer_ticks;
@@ -37,6 +38,7 @@ void read_rtc(void);
 void play_sound(uint32_t frequency);
 void stop_sound(void);
 void beep(uint32_t frequency, uint32_t duration_ticks);
+void reboot(void);
 
 extern volatile int32_t mouse_x;
 extern volatile int32_t mouse_y;

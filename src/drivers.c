@@ -3,7 +3,7 @@
 #include "vga.h"
 
 volatile int command_len = 0;
-volatile char command_buffer[256];
+volatile char command_buffer[COMMAND_BUFFER_SIZE];
 volatile uint8_t command_ready = 0;
 volatile uint32_t timer_ticks = 0;
 const char scancode_to_ascii[] = {
@@ -31,9 +31,10 @@ void timer_handler(void) {
     
     if (timer_ticks % 100 == 0) {
         debug_put('T', 79); //debug: every 100 ticks
-		if (timer_ticks % 30 == 0){
-			debug_put('t', 79);
-		}
+        if (timer_ticks % 30 == 0) {
+            debug_put('t', 79);
+        }
+
     }
 
     //EOI
@@ -64,8 +65,7 @@ void keyboard_handler(void) {
 		if (ascii == '\n') {
             command_buffer[command_len] = '\0';
             
-            sym = ((sym / 160) + 1) * 160;
-            
+            new_line();
             command_ready = 1;
 			
         } else if (ascii == '\b') {
@@ -79,7 +79,7 @@ void keyboard_handler(void) {
             }
 		} else if (ascii != 0) {
             //store commands
-            if (command_len < 255) {
+            if (command_len < COMMAND_BUFFER_SIZE - 1) {
                 command_buffer[command_len++] = ascii;
                 
                 if (sym >= 4000) {
@@ -171,6 +171,18 @@ void beep(uint32_t frequency, uint32_t duration_ticks) {
     stop_sound();
 }
 
+void reboot(void)
+{
+    while (inb(0x64) & 0x02)
+        ;
+
+    outb(0x64, 0xFE);
+
+    uint16_t empty_idt[3] = {0, 0, 0};
+    __asm__ __volatile__("lidt %0" : : "m"(empty_idt));
+    __asm__ __volatile__("int $0");
+}
+
 int32_t volatile mouse_x = 0;
 int32_t volatile mouse_y = 0;
 uint8_t volatile mouse_buttons = 0;
@@ -256,11 +268,8 @@ void mouse_handler(void) {
         mouse_x += offset_x;
         mouse_y -= offset_y;
 
-        //if (mouse_buttons & 1) debug_put('L', 70); // Left Clicked
         if (mouse_buttons & 1) print_serial("left mouse button clicked\n");
-        //if (mouse_buttons & 2) debug_put('R', 71); // Right Clicked
         if (mouse_buttons & 2) print_serial("right mouse button clicked\n");
-        //if (mouse_buttons & 4) debug_put('M', 72); // middle click
         if (mouse_buttons & 4) print_serial("middle mouse button clicked\n");
     }
 
