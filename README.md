@@ -18,19 +18,20 @@ Don't expect anything particularly useful yet.
 - Pages
 - Basic commands support
 - Basic usermode
+- Basic file operations
 
 ## Building
 
-`make`
+`make release`
 
-Or, if you want to be a little stricter and get much more errors and warnings:
+Or, if you want to debug it:
 
-`make strict`
+`make debug`
 
 ### Other makefile arguments
 
-| Argument | Description |
-| :--- | :--- |
-| `TOOLCHAIN=clang` | Compile project using Clang toolchain |
-| `TOOLCHAIN=gcc` | Compile project using GCC (`i386-elf-gcc`) |
-| `CROSS_PREFIX=i386-elf-` | Set target architecture prefix for GCC |
+| Argument                 | Description                                |
+|:-------------------------|:-------------------------------------------|
+| `TOOLCHAIN=clang`        | Compile project using Clang toolchain      |
+| `TOOLCHAIN=gcc`          | Compile project using GCC (`i386-elf-gcc`) |
+| `CROSS_PREFIX=i386-elf-` | Set target architecture prefix for GCC     |

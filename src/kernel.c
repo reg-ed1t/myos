@@ -8,6 +8,7 @@
 #include "pmm.h"
 #include "vmm.h"
 #include "user.h"
+#include "fsshell.h"
 
 extern void timer_isr_asm(void);
 extern void keyboard_isr_asm(void);
@@ -99,6 +100,13 @@ static void process_command(const volatile char* buffer)
         kprint("crash - list crash tests.\n");
         kprint("time - print the current time.\n");
         kprint("beep - make a beep.\n");
+        kprint("ls - list files on the RAM disk.\n");
+        kprint("cat <file> - print a file.\n");
+        kprint("write <file> <text> - create or replace a file.\n");
+        kprint("append <file> <text> - add a line to a file.\n");
+        kprint("touch/rm <file> - create/detele a file.\n");
+        kprint("cp/mv <from> <to> - copy/move a file.\n");
+        kprint("df - display info of the disk usage.\n");
         kprint("Crash tests:\n");
         kprint("  crash -zerodivide\n");
         kprint("  crash -pages\n");
@@ -458,6 +466,8 @@ void kernel_main(uint32_t multiboot_magic, uint32_t multiboot_info_addr)
     pmm_free_block(phys_frame);
 
     print_serial("Virtual Memory Test Passed! Unmapped 0xC0000000 successfully.\n");
+
+    fs_shell_init();
 
     init_timer(100);
 
