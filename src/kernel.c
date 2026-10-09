@@ -158,9 +158,9 @@ static void process_command(const volatile char* buffer)
 
             trigger_bounds();
 
-        } else {
+        } else if (!fs_shell_handle(buffer)) {
 
-            kprint("unknown crash test");
+            kprint("unknown command");
         }
 
     } else if (command_is(buffer, "time")) {
@@ -218,7 +218,7 @@ static void process_command(const volatile char* buffer)
 
     } else if (command_is(buffer, "ring3")) {
         enter_ring3();
-    } else {
+    } else if (!fs_shell_handle(buffer)) {
 
         kprint("unknown command");
     }
