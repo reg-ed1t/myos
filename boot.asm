@@ -117,29 +117,62 @@ extern syscall_handler
 
 syscall_isr_asm:
     cld
-    push dword 0            ; err_code
-    push dword 0x80         ; int_no
-    pusha
     push ds
     push es
     push fs
     push gs
+    pusha
+
     mov ax, 0x10
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
+
     push esp
     call syscall_handler
     add esp, 4
-    mov [esp + 44], eax     ; saved EAX = 16 (segments) + 28 (inside pusha block)
+
+    cmp eax, 0xDEADBEEF
+    je .do_exit
+
+    mov [esp + 28], eax     ; normal return value
+    popa
     pop gs
     pop fs
     pop es
     pop ds
-    popa
-    add esp, 8
     iretd
+
+.do_exit:
+    popa
+    pop gs
+    pop fs
+    pop es
+    pop ds
+
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    mov ss, ax
+
+    ; call the cleanup from C
+    extern cleanup_user_mode
+    call cleanup_user_mode
+
+    ; print the message
+    extern kprint
+    push message_returned
+    call kprint
+    add esp, 4
+
+    sti
+    ret
+
+message_returned:
+    db 10, "Returned from user mode", 10, 0
 
 ; GDT
 global gdt_flush

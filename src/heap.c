@@ -199,17 +199,24 @@ void heap_init(void)
 
 void* kmalloc(uint32_t size)
 {
-    if (size == 0 || size > KERNEL_HEAP_END - KERNEL_HEAP_START) {
+    if (size == 0 ||
+        size > KERNEL_HEAP_END - KERNEL_HEAP_START ||
+        size > 0xFFFFFFFFU - 7U) {
         return 0;
     }
+
     size = align_up(size, 8);
+
+    if (size == 0 ||
+        size > KERNEL_HEAP_END - KERNEL_HEAP_START) {
+        return 0;
+    }
 
     heap_block_t* block = heap_head;
 
     while (block) {
         if (block->free && block->size >= size) {
             split_block(block, size);
-
             block->free = 0;
 
             return (void*)((uint32_t)block +
@@ -228,7 +235,6 @@ void* kmalloc(uint32_t size)
     while (block) {
         if (block->free && block->size >= size) {
             split_block(block, size);
-
             block->free = 0;
 
             return (void*)((uint32_t)block +

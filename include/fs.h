@@ -32,6 +32,14 @@ typedef struct {
     uint32_t max_files;
 } fs_info_t;
 
+typedef struct {
+    char name[FS_NAME_MAX + 1];
+    uint32_t size;
+    uint16_t first_block;
+    uint8_t used;
+    uint8_t reserved;
+} fs_dirent_t;
+
 const char* fs_strerror(int error);
 
 int fs_format(block_device_t* dev);

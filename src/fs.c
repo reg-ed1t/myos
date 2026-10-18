@@ -1,18 +1,18 @@
 #include "fs.h"
 #include "kstring.h"
 
-#define FS_MAGIC            0x5346594Du
-#define FS_VERSION          1u
-#define FS_MIN_SECTORS      16u
-#define FS_MAX_SECTORS      0xFFFFu
+#define FS_MAGIC 0x5346594Du
+#define FS_VERSION 1u
+#define FS_MIN_SECTORS 16u
+#define FS_MAX_SECTORS 0xFFFFu
 
-#define FS_DIRENT_SIZE      32u
-#define FS_DIRENTS_PER_SEC  (FS_SECTOR_SIZE / FS_DIRENT_SIZE)
-#define FS_DIR_SECTORS      (FS_MAX_FILES / FS_DIRENTS_PER_SEC)
+#define FS_DIRENT_SIZE 32u
+#define FS_DIRENTS_PER_SEC (FS_SECTOR_SIZE / FS_DIRENT_SIZE)
+#define FS_DIR_SECTORS (FS_MAX_FILES / FS_DIRENTS_PER_SEC)
 
 #define FAT_ENTRIES_PER_SEC (FS_SECTOR_SIZE / 2u)
-#define FAT_FREE            ((uint16_t)0x0000)
-#define FAT_EOC             ((uint16_t)0xFFFF)
+#define FAT_FREE ((uint16_t)0x0000)
+#define FAT_EOC ((uint16_t)0xFFFF)
 
 typedef struct {
     uint32_t magic;
@@ -25,14 +25,6 @@ typedef struct {
     uint32_t data_start;
     uint32_t data_blocks;
 } fs_super_t;
-
-typedef struct {
-    char name[FS_NAME_MAX + 1];
-    uint32_t size;
-    uint16_t first_block;
-    uint8_t used;
-    uint8_t reserved;
-} fs_dirent_t;
 
 typedef union {
     uint8_t bytes[FS_SECTOR_SIZE];
@@ -549,8 +541,7 @@ int fs_create(const char* name)
     return dir_store(index, &entry);
 }
 
-static void write_abort(int existed, uint32_t index, fs_dirent_t* entry,
-                        uint16_t new_first)
+static void write_abort(int existed, uint32_t index, fs_dirent_t* entry, uint16_t new_first)
 {
     free_chain(new_first);
 
@@ -669,8 +660,7 @@ int fs_write(const char* name, const void* data, uint32_t length)
     return r;
 }
 
-static void append_undo(uint16_t tail, uint16_t new_first,
-                        uint32_t used_in_last, uint32_t top_up)
+static void append_undo(uint16_t tail, uint16_t new_first, uint32_t used_in_last, uint32_t top_up)
 {
     free_chain(new_first);
 
@@ -727,8 +717,7 @@ int fs_append(const char* name, const void* data, uint32_t length)
     }
 
     uint32_t used_in_last = old_size % FS_SECTOR_SIZE;
-    uint32_t room = (old_size != 0 && used_in_last != 0)
-                    ? FS_SECTOR_SIZE - used_in_last : 0;
+    uint32_t room = (old_size != 0 && used_in_last != 0) ? FS_SECTOR_SIZE - used_in_last : 0;
     uint32_t top_up = length < room ? length : room;
     uint32_t extra_blocks = blocks_for(length - top_up);
     uint32_t free_blocks = 0;

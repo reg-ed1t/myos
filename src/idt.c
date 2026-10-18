@@ -209,7 +209,6 @@ void setup_idt(void)
     set_gate(28, exception_28);
     set_gate(29, exception_29);
     set_gate(30, exception_30);
-    set_gate(30, exception_30);
 
     for (int i = 0x20; i <= 0x27; i++) {
         set_gate(i, default_master_irq);

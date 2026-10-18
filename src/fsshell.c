@@ -7,7 +7,7 @@
 #include "io.h"
 
 #define SHELL_LINE_MAX 256u
-#define NAME_BUFFER    (FS_NAME_MAX + 2u)
+#define NAME_BUFFER (FS_NAME_MAX + 2u)
 
 static block_device_t* data_disk = 0;
 
@@ -434,7 +434,6 @@ int fs_shell_handle(const volatile char* line)
 
 int fs_shell_init(void)
 {
-
     data_disk = ramdisk_create(RAMDISK_DEFAULT_SECTORS);
 
     if (!data_disk) {
@@ -449,6 +448,11 @@ int fs_shell_init(void)
         kprint("WARNING: could not format the RAM disk: ");
         kprint(fs_strerror(r));
         new_line();
+
+        fs_unmount();
+        ramdisk_destroy(data_disk);
+        data_disk = 0;
+
         return 0;
     }
 
@@ -456,7 +460,13 @@ int fs_shell_init(void)
             "Welcome to myos! This file lives on the RAM disk.\n"
             "Try: ls, cat, write, append, cp, mv, rm, df\n";
 
-    fs_write("readme.txt", welcome, (uint32_t)(sizeof(welcome) - 1));
+    r = fs_write("readme.txt", welcome,(uint32_t)(sizeof(welcome) - 1));
+
+    if (r != FS_OK) {
+        kprint("WARNING: could not create readme.txt: ");
+        kprint(fs_strerror(r));
+        new_line();
+    }
 
     print_serial("RAM disk ready.\n");
 
