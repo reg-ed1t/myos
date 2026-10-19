@@ -2,6 +2,39 @@
 #include "vga.h"
 #include "fs.h"
 #include "kstring.h"
+#include "heap.h"
+
+#define MAX_FDS 8
+
+typedef struct {
+    int used;
+    char name[FS_NAME_MAX + 1];
+    uint32_t offset;
+} fd_entry_t;
+
+static fd_entry_t fd_table[MAX_FDS];
+
+static int alloc_fd(const char* name)
+{
+    for (int i = 0; i < MAX_FDS; i++) {
+        if (!fd_table[i].used) {
+            fd_table[i].used = 1;
+            kstrlcpy(fd_table[i].name, name, sizeof(fd_table[i].name));
+            fd_table[i].offset = 0;
+            return i;
+        }
+    }
+    return -1;
+}
+
+static void free_fd(int fd)
+{
+    if (fd >= 0 && fd < MAX_FDS) {
+        fd_table[fd].used = 0;
+        fd_table[fd].name[0] = 0;
+        fd_table[fd].offset = 0;
+    }
+}
 
 static uint32_t sys_write_char(uint32_t c)
 {
@@ -23,42 +56,51 @@ static uint32_t sys_write(uint32_t ptr, uint32_t len)
 static uint32_t sys_exit(uint32_t code)
 {
     (void)code;
-    // Special magic value the ISR looks for
     return 0xDEADBEEF;
 }
 
 static uint32_t sys_open(uint32_t name_ptr)
 {
     const char* name = (const char*)name_ptr;
-    // For now we just check if the file exists
-    fs_dirent_t entry;
-    (void)entry;
-    uint32_t index;
-    (void)index;
-    int r = fs_create(name);// create if not exists (simple)
+
+    int r = fs_create(name);
     if (r != FS_OK && r != FS_ERR_EXISTS)
         return (uint32_t)r;
-    return 0; // fake fd 0 for now
+
+    int fd = alloc_fd(name);
+    if (fd < 0)
+        return (uint32_t)FS_ERR_NO_SPACE;
+
+    return (uint32_t)fd;
 }
 
 static uint32_t sys_read(uint32_t fd, uint32_t buf, uint32_t len)
 {
-    (void)fd;
-    (void)buf;
-    (void)len;
-    // Very simple demo – just return 0 for now
-    return 0;
+    if (fd >= MAX_FDS || !fd_table[fd].used)
+        return (uint32_t)FS_ERR_BAD_ARG;
+
+    int n = fs_read(fd_table[fd].name, fd_table[fd].offset, (void*)buf, len);
+    if (n > 0)
+        fd_table[fd].offset += (uint32_t)n;
+
+    return (uint32_t)n;
 }
 
 static uint32_t sys_write_file(uint32_t fd, uint32_t buf, uint32_t len)
 {
-    (void)fd; (void)buf; (void)len;
-    return 0;
+    if (fd >= MAX_FDS || !fd_table[fd].used)
+        return (uint32_t)FS_ERR_BAD_ARG;
+
+    int r = fs_write(fd_table[fd].name, (const void*)buf, len);
+    if (r == FS_OK)
+        fd_table[fd].offset = len;   // simple: treat as overwrite
+
+    return (uint32_t)r;
 }
 
 static uint32_t sys_close(uint32_t fd)
 {
-    (void)fd;
+    free_fd((int)fd);
     return SYSCALL_SUCCESS;
 }
 
