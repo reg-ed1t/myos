@@ -4,13 +4,27 @@
 #include "gdt.h"
 #include "vga.h"
 #include "io.h"
+#include "kstring.h"
+#include "syscall.h"
+
+#define NAME_OFF   0x800 // data lives far behind the code, so the two can never overlap
+#define HELLO_OFF  0x810
+#define BUFFER_OFF 0x820
 
 static uint32_t user_code_va  = 0;
 static uint32_t user_stack_va = 0;
 static void* user_code_phys  = 0;
 static void* user_stack_phys = 0;
 extern void enter_user_mode(uint32_t entry, uint32_t user_esp);
-extern uint32_t stack_top;
+extern uint32_t ring0_stack_top;
+
+// Write a 32-bit immediate, little endian
+static void emit32(uint8_t* code, int* i, uint32_t value)
+{
+    for (int k = 0; k < 4; k++) {
+        code[(*i)++] = (uint8_t)(value >> (8 * k));
+    }
+}
 
 void enter_ring3(void)
 {
@@ -32,6 +46,8 @@ void enter_ring3(void)
 
     if (!map_page(code_phys,  (void*)code_va,  PAGE_PRESENT | PAGE_RW | PAGE_USER) ||
         !map_page(stack_phys, (void*)stack_va, PAGE_PRESENT | PAGE_RW | PAGE_USER)) {
+        unmap_page((void*)code_va);
+        unmap_page((void*)stack_va);
         pmm_free_block(code_phys);
         pmm_free_block(stack_phys);
         kprint("map fail\n");
@@ -45,53 +61,54 @@ void enter_ring3(void)
     uint8_t* code = (uint8_t*)code_va;
     int i = 0;
 
-    // string "test.txt" at 0x40000050
-    code[0x50] = 't'; code[0x51] = 'e'; code[0x52] = 's'; code[0x53] = 't';
-    code[0x54] = '.'; code[0x55] = 't'; code[0x56] = 'x'; code[0x57] = 't';
-    code[0x58] = 0;
+    memset(code, 0, 4096);
+    kstrlcpy((char*)(code + NAME_OFF), "test.txt", 16);
+    kstrlcpy((char*)(code + HELLO_OFF), "hello", 16);
 
-// string "hello" at 0x40000060
-    code[0x60] = 'h'; code[0x61] = 'e'; code[0x62] = 'l'; code[0x63] = 'l';
-    code[0x64] = 'o'; code[0x65] = 0;
+    // SYS_OPEN("test.txt"), esi keeps the fd because every syscall returns in eax
+    code[i++] = 0xB8; emit32(code, &i, SYS_OPEN);                 // mov eax, SYS_OPEN
+    code[i++] = 0xBB; emit32(code, &i, code_va + NAME_OFF);       // mov ebx, name
+    code[i++] = 0xCD; code[i++] = 0x80;                           // int 0x80
+    code[i++] = 0x89; code[i++] = 0xC6;                           // mov esi, eax
 
-// SYS_OPEN("test.txt")
-    code[i++] = 0xB8; code[i++] = 0x04; code[i++] = 0x00; code[i++] = 0x00; code[i++] = 0x00; // mov eax, 4
-    code[i++] = 0xBB; code[i++] = 0x50; code[i++] = 0x00; code[i++] = 0x00; code[i++] = 0x40; // mov ebx, 0x40000050
-    code[i++] = 0xCD; code[i++] = 0x80; // int 0x80
-// eax now holds fd
-
-// SYS_WRITE_FILE(fd, "hello", 5)
-    code[i++] = 0x89; code[i++] = 0xC3; // mov ebx, eax
-    code[i++] = 0xB8; code[i++] = 0x06; code[i++] = 0x00; code[i++] = 0x00; code[i++] = 0x00; // mov eax, 6
-    code[i++] = 0xB9; code[i++] = 0x60; code[i++] = 0x00; code[i++] = 0x00; code[i++] = 0x40; // mov ecx, 0x40000060
-    code[i++] = 0xBA; code[i++] = 0x05; code[i++] = 0x00; code[i++] = 0x00; code[i++] = 0x00; // mov edx, 5
+    // SYS_WRITE_FILE(fd, "hello", 5)
+    code[i++] = 0x89; code[i++] = 0xF3;                           // mov ebx, esi
+    code[i++] = 0xB8; emit32(code, &i, SYS_WRITE_FILE);           // mov eax, SYS_WRITE_FILE
+    code[i++] = 0xB9; emit32(code, &i, code_va + HELLO_OFF);      // mov ecx, hello
+    code[i++] = 0xBA; emit32(code, &i, 5);                        // mov edx, 5
     code[i++] = 0xCD; code[i++] = 0x80;
 
-// SYS_READ(fd, buffer, 5)  (buffer at 0x40000070)
-    code[i++] = 0xB8; code[i++] = 0x05; code[i++] = 0x00; code[i++] = 0x00; code[i++] = 0x00; // mov eax, 5
-    code[i++] = 0xB9; code[i++] = 0x70; code[i++] = 0x00; code[i++] = 0x00; code[i++] = 0x40; // mov ecx, 0x40000070
-    code[i++] = 0xBA; code[i++] = 0x05; code[i++] = 0x00; code[i++] = 0x00; code[i++] = 0x00; // mov edx, 5
+    // SYS_READ(fd, buffer, 5)
+    code[i++] = 0x89; code[i++] = 0xF3;                           // mov ebx, esi
+    code[i++] = 0xB8; emit32(code, &i, SYS_READ);                 // mov eax, SYS_READ
+    code[i++] = 0xB9; emit32(code, &i, code_va + BUFFER_OFF);     // mov ecx, buffer
+    code[i++] = 0xBA; emit32(code, &i, 5);                        // mov edx, 5
     code[i++] = 0xCD; code[i++] = 0x80;
 
-// SYS_WRITE(buffer, 5)  so we can see what was read
-    code[i++] = 0xB8; code[i++] = 0x02; code[i++] = 0x00; code[i++] = 0x00; code[i++] = 0x00; // mov eax, 2
-    code[i++] = 0xBB; code[i++] = 0x70; code[i++] = 0x00; code[i++] = 0x00; code[i++] = 0x40; // mov ebx, 0x40000070
-    code[i++] = 0xB9; code[i++] = 0x05; code[i++] = 0x00; code[i++] = 0x00; code[i++] = 0x00; // mov ecx, 5
+    // SYS_WRITE(buffer, 5), shows what was read
+    code[i++] = 0xB8; emit32(code, &i, SYS_WRITE);                // mov eax, SYS_WRITE
+    code[i++] = 0xBB; emit32(code, &i, code_va + BUFFER_OFF);     // mov ebx, buffer
+    code[i++] = 0xB9; emit32(code, &i, 5);                        // mov ecx, 5
     code[i++] = 0xCD; code[i++] = 0x80;
 
-// SYS_CLOSE(fd)
-    code[i++] = 0xB8; code[i++] = 0x07; code[i++] = 0x00; code[i++] = 0x00; code[i++] = 0x00; // mov eax, 7
+    // SYS_CLOSE(fd)
+    code[i++] = 0x89; code[i++] = 0xF3;                           // mov ebx, esi
+    code[i++] = 0xB8; emit32(code, &i, SYS_CLOSE);                // mov eax, SYS_CLOSE
     code[i++] = 0xCD; code[i++] = 0x80;
 
-// SYS_EXIT(0)
-    code[i++] = 0xB8; code[i++] = 0x03; code[i++] = 0x00; code[i++] = 0x00; code[i++] = 0x00;
-    code[i++] = 0xBB; code[i++] = 0x00; code[i++] = 0x00; code[i++] = 0x00; code[i++] = 0x00;
+    // SYS_EXIT(0)
+    code[i++] = 0xB8; emit32(code, &i, SYS_EXIT);                 // mov eax, SYS_EXIT
+    code[i++] = 0xBB; emit32(code, &i, 0);                        // mov ebx, 0
     code[i++] = 0xCD; code[i++] = 0x80;
 
     code[i++] = 0xEB; code[i++] = 0xFE; // safety
 
-    set_kernel_stack((uint32_t)&stack_top);
+    set_kernel_stack((uint32_t)&ring0_stack_top);
     enter_user_mode(code_va, stack_va + 0x1000);
+
+    // SYS_EXIT comes back here
+    cleanup_user_mode();
+    kprint("\nReturned from user mode");
 }
 
 void cleanup_user_mode(void)
@@ -109,4 +126,3 @@ void cleanup_user_mode(void)
         user_stack_phys = 0;
     }
 }
-

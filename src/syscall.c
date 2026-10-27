@@ -3,6 +3,8 @@
 #include "fs.h"
 #include "kstring.h"
 #include "heap.h"
+#include "user.h"
+#include "io.h"
 
 #define MAX_FDS 8
 
@@ -56,7 +58,15 @@ static uint32_t sys_write(uint32_t ptr, uint32_t len)
 static uint32_t sys_exit(uint32_t code)
 {
     (void)code;
-    return 0xDEADBEEF;
+
+    for (int i = 0; i < MAX_FDS; i++) {
+        free_fd(i);
+    }
+
+    leave_user_mode();
+    print_serial("exiting ring3");
+
+    return SYSCALL_SUCCESS;
 }
 
 static uint32_t sys_open(uint32_t name_ptr)
@@ -93,7 +103,7 @@ static uint32_t sys_write_file(uint32_t fd, uint32_t buf, uint32_t len)
 
     int r = fs_write(fd_table[fd].name, (const void*)buf, len);
     if (r == FS_OK)
-        fd_table[fd].offset = len;   // simple: treat as overwrite
+        fd_table[fd].offset = 0;
 
     return (uint32_t)r;
 }

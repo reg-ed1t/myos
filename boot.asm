@@ -117,11 +117,13 @@ extern syscall_handler
 
 syscall_isr_asm:
     cld
+    push dword 0
+    push dword 0x80
+    pusha
     push ds
     push es
     push fs
     push gs
-    pusha
 
     mov ax, 0x10
     mov ds, ax
@@ -133,46 +135,15 @@ syscall_isr_asm:
     call syscall_handler
     add esp, 4
 
-    cmp eax, 0xDEADBEEF
-    je .do_exit
+    mov [esp + 44], eax
 
-    mov [esp + 28], eax     ; normal return value
-    popa
     pop gs
     pop fs
     pop es
     pop ds
+    popa
+    add esp, 8
     iretd
-
-.do_exit:
-    popa
-    pop gs
-    pop fs
-    pop es
-    pop ds
-
-    mov ax, 0x10
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
-    mov ss, ax
-
-    ; call the cleanup from C
-    extern cleanup_user_mode
-    call cleanup_user_mode
-
-    ; print the message
-    extern kprint
-    push message_returned
-    call kprint
-    add esp, 4
-
-    sti
-    ret
-
-message_returned:
-    db 10, "Returned from user mode", 10, 0
 
 ; GDT
 global gdt_flush
@@ -204,9 +175,16 @@ tss_flush:
 ; Enter user mode
 global enter_user_mode
 enter_user_mode:
+    pushfd
+    push ebp
+    push ebx
+    push esi
+    push edi
+    mov [kernel_esp], esp
+
     cli
-    mov eax, [esp + 4]
-    mov ebx, [esp + 8]
+    mov eax, [esp + 24]
+    mov ebx, [esp + 28]
 
     mov cx, 0x23
     mov ds, cx
@@ -221,6 +199,17 @@ enter_user_mode:
     push 0x1B
     push eax
     iretd
+
+; Back to the kernel
+global leave_user_mode
+leave_user_mode:
+    mov esp, [kernel_esp]
+    pop edi
+    pop esi
+    pop ebx
+    pop ebp
+    popfd
+    ret
 
 ; CPU EXCEPTIONS
 global exception_0
@@ -494,3 +483,15 @@ stack_bottom:
     resb 16384
 
 stack_top:
+
+align 16
+
+global ring0_stack_top
+
+ring0_stack_bottom:
+    resb 16384
+
+ring0_stack_top:
+
+kernel_esp:
+    resd 1
